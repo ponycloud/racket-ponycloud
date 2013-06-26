@@ -4,29 +4,26 @@
 ;
 
 (require racket/function
+         racket/generator
          racket/string
          racket/format)
 
-(provide bond-name-allocator
-         bridge-name-allocator
-         vxlan-name-allocator
+(provide allocate-bond-name
+         allocate-bridge-name
+         allocate-vxlan-name
          generate-hwaddr)
 
 
-(define-syntax-rule (define-allocator name pfx num-bytes)
-  (begin
-    (void
-      (thread
-        (thunk
-          (for ((i (in-cycle (in-range (expt 16 num-bytes)))))
-            (let ((value (format "~a.~a" pfx (number->string i 16))))
-              (channel-put name value))))))
-    (define name (make-channel))))
+(define (make-allocator prefix num-bytes)
+  (generator ()
+    (for ((i (in-cycle (in-range (expt 16 num-bytes)))))
+      (let ((value (format "~a.~a" prefix (number->string i 16))))
+        (yield value)))))
 
 
-(define-allocator bond-name-allocator "bond" 5)
-(define-allocator bridge-name-allocator "br" 7)
-(define-allocator vxlan-name-allocator "vx" 7)
+(define allocate-bond-name   (make-allocator "bond" 5))
+(define allocate-bridge-name (make-allocator "br" 7))
+(define allocate-vxlan-name  (make-allocator "vx" 7))
 
 
 (define (generate-hwaddr)

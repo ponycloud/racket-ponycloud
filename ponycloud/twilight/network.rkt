@@ -21,8 +21,8 @@
 ;; Configured bond (with it's private bridge).
 (define bond%
   (class object%
-    (field (bond-name (channel-get bond-name-allocator))
-           (bridge-name (channel-get bridge-name-allocator))
+    (field (bond-name (allocate-bond-name))
+           (bridge-name (allocate-bridge-name))
            (slaves null)
            (roles null))
 
@@ -295,7 +295,7 @@
       (if vlan-id
         (begin
           ;; Generate some names and place the address on the new bridge.
-          (set! bridge-name (channel-get bridge-name-allocator))
+          (set! bridge-name (allocate-bridge-name))
           (set! vlan-name   (format "~a.~a" (get-field bridge-name bond)
                                             vlan-id))
           (set! device-name bridge-name))

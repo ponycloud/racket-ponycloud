@@ -23,6 +23,7 @@
   (class object%
     (field (bond-name (allocate-bond-name))
            (bridge-name (allocate-bridge-name))
+           (hwaddr (generate-hwaddr))
            (slaves null)
            (roles null))
 
@@ -43,14 +44,19 @@
       (when (interface-bond? bond-name)
         (remove-bond bond-name))
 
-      ;; Create the bridge interface unless it already exists.
       (unless (interface-bridge? bridge-name)
-        (add-bridge bridge-name))
+        ;; Create the bridge interface unless it already exists.
+        (add-bridge bridge-name)
 
-      ;; We don't want bond unless we have slaves for it.
+        ;; Assign the persistent, generated address.
+        (set-interface-addr! bridge-name hwaddr))
+
       (unless (null? slaves)
         ;; We have slaves, create the bond interface.
         (add-bond bond-name)
+
+        ;; Assign the persistent, generated address.
+        (set-interface-addr! bond-name hwaddr)
 
         ;; Set desired bonding options.
         (when mode
@@ -194,6 +200,7 @@
       ((network-notify)
        'bond (hasheq 'uuid uuid
                      'mode mode
+                     'hwaddr hwaddr
                      'lacp-rate lacp-rate
                      'xmit-hash-policy xmit-hash-policy
                      'slaves (map (curry dynamic-get-field 'uuid) slaves)
@@ -256,6 +263,8 @@
            (vlan-name   #f)  ; Name of VLAN interface to use with vlan-id.
            (master      #f)) ; Master bond configuration.
 
+    (field (hwaddr (generate-hwaddr))) ; Generate MAC for potential bridge.
+
 
     (define/public (destroy)
       ;; Tell bond to get rid of this role's interfaces.
@@ -307,9 +316,14 @@
       (when (and vlan-name (not (interface-vlan? vlan-name)))
         (add-vlan vlan-name (get-field bridge-name bond) vlan-id))
 
-      ;; Create bridge if we need it.
       (when (and bridge-name (not (interface-bridge? bridge-name)))
+        ;; Create the required bridge.
         (add-bridge bridge-name)
+
+        ;; Assign the persistent MAC address.
+        (set-interface-addr! bridge-name hwaddr)
+
+        ;; Plug in the upstream interface.
         (bridge-port-add bridge-name vlan-name))
 
       ;; Notify user about the changes.
@@ -356,9 +370,7 @@
                          'vlan-id vlan-id
                          'address address
                          'bond (and master (get-field uuid master))
-                         'device-name device-name
-                         'bridge-name bridge-name
-                         'vlan-name vlan-name)))
+                         'hwaddr hwaddr)))
 
 
     ;; Construct parent object.

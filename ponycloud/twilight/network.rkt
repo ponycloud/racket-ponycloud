@@ -197,14 +197,14 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify)
-       'bond (hasheq 'uuid uuid
-                     'mode mode
-                     'hwaddr hwaddr
-                     'lacp-rate lacp-rate
-                     'xmit-hash-policy xmit-hash-policy
-                     'slaves (map (curry dynamic-get-field 'uuid) slaves)
-                     'roles (map (curry dynamic-get-field 'uuid) roles))))
+      ((network-notify) 'bond uuid
+        (hasheq 'uuid uuid
+                'mode mode
+                'hwaddr hwaddr
+                'lacp-rate lacp-rate
+                'xmit-hash-policy xmit-hash-policy
+                'slaves (map (curry dynamic-get-field 'uuid) slaves)
+                'roles (map (curry dynamic-get-field 'uuid) roles))))
 
 
     (begin
@@ -239,11 +239,11 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify)
-       'nic (hasheq 'uuid uuid
-                    'hwaddr hwaddr
-                    'device device
-                    'bond (and master (get-field uuid master)))))
+      ((network-notify) 'nic uuid
+        (hasheq 'uuid uuid
+                'hwaddr hwaddr
+                'device device
+                'bond (and master (get-field uuid master)))))
 
 
     ;; Construct parent object.
@@ -365,12 +365,12 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify)
-       'nic-role (hasheq 'uuid uuid
-                         'vlan-id vlan-id
-                         'address address
-                         'bond (and master (get-field uuid master))
-                         'hwaddr hwaddr)))
+      ((network-notify) 'nic-role uuid
+        (hasheq 'uuid uuid
+                'vlan-id vlan-id
+                'address address
+                'bond (and master (get-field uuid master))
+                'hwaddr hwaddr)))
 
 
     ;; Construct parent object.

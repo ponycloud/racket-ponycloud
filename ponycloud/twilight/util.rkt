@@ -3,15 +3,13 @@
 ; Miscelaneous Utilities
 ;
 
-(require racket/function
+(require racket/contract
+         racket/function
          racket/generator
          racket/string
          racket/format)
 
-(provide allocate-bond-name
-         allocate-bridge-name
-         allocate-vxlan-name
-         generate-hwaddr)
+(provide (except-out (all-defined-out) make-allocator))
 
 
 (define (make-allocator prefix num-bytes)

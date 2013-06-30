@@ -4,11 +4,19 @@
 ;
 
 (require racket/contract
+         racket/string
          racket/class
          tasks
          udev)
 
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) get-device-mac))
+
+
+(define (get-device-mac device)
+  (let ((id (udev-device-get-property-value device 'ID_NET_NAME_MAC)))
+    (if id
+      (string-join (regexp-match* ".." (substring id 3)) ":")
+      "XX:XX:XX:XX:XX:XX")))
 
 
 (define udev-monitor%
@@ -39,7 +47,8 @@
         ;; Generate list of sysnames for all matches devices.
         (for/list ((syspath (in-list (udev-enumerate-get enumerator))))
           (let ((device (udev-device-new-from-syspath udev syspath)))
-            (udev-device-get-sysname device)))))
+            (list (udev-device-get-sysname device)
+                  (get-device-mac device))))))
 
 
     (begin
@@ -52,13 +61,14 @@
 
       (task
         ;; Replay existing devices once we start.
-        (for ((sysname (in-list (enumerate))))
-          (sink 'add sysname)))
+        (for ((info (in-list (enumerate))))
+          (apply sink 'add info)))
 
       ;; Dispatch device events.
       (recurring-event-task (device (udev-monitor-evt monitor))
         (sink (string->symbol (udev-device-get-action device))
-              (udev-device-get-sysname device))))
+              (udev-device-get-sysname device)
+              (get-device-mac device))))
 
     ;; Construct parent object.
     (super-new)))

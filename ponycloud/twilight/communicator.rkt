@@ -157,7 +157,7 @@
 
                 (begin
                   (hash-remove! remote-state key)
-                  (task (send twilight remove-entity entity id)))))))))
+                  (task (send twilight remove-entity entity id old-data)))))))))
 
 
     (define/public (publish changes)

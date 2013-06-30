@@ -6,8 +6,10 @@
 (require racket/contract
          racket/function
          racket/class
+         racket/set
          sysfs/net
-         rtnl/simple)
+         rtnl/simple
+         tasks)
 
 (require "util.rkt")
 
@@ -78,6 +80,11 @@
 
       ;; Notify user about the changes.
       (notify))
+
+
+    ;; Update bond parameters.
+    (define/public (update)
+      (reset slaves))
 
 
     (define/public (add-slave nic)
@@ -201,8 +208,8 @@
         (hasheq 'uuid uuid
                 'mode mode
                 'hwaddr hwaddr
-                'lacp-rate lacp-rate
-                'xmit-hash-policy xmit-hash-policy
+                'lacp_rate lacp-rate
+                'xmit_hash_policy xmit-hash-policy
                 'slaves (map (curry dynamic-get-field 'uuid) slaves)
                 'roles (map (curry dynamic-get-field 'uuid) roles))))
 
@@ -219,12 +226,14 @@
 ;; Configured physical interface.
 (define nic%
   (class object%
-    (init-field uuid         ; Unique identificator of the entity.
-                hwaddr)      ; Hardware (MAC) address of the interface.
+    ;; Hardware (MAC) address of the interface.
+    (init-field hwaddr)
 
-    (init-field (device #f)) ; Name of the network interface.
+    ;; Name of the network interface.
+    (init-field (device #f))
 
-    (field (master #f))      ; Bonding master.
+    ;; Bonding master.
+    (field (master #f))
 
 
     ;; Called when interface disappears or Twilight terminates.
@@ -239,9 +248,8 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify) 'nic uuid
-        (hasheq 'uuid uuid
-                'hwaddr hwaddr
+      ((network-notify) 'nic hwaddr
+        (hasheq 'hwaddr hwaddr
                 'device device
                 'bond (and master (get-field uuid master)))))
 
@@ -254,7 +262,7 @@
 (define role%
   (class object%
     (init-field uuid          ; Unique identificator of the entity.
-                name          ; Role name, something like 'core or 'virtual.
+                (name #f)     ; Role name, something like 'core or 'virtual.
                 (vlan-id #f)  ; VLAN of the underlying bond to use.
                 (address #f)) ; IP address associated with the role.
 
@@ -367,10 +375,188 @@
       ;; Notify about our current state.
       ((network-notify) 'nic-role uuid
         (hasheq 'uuid uuid
-                'vlan-id vlan-id
+                'name name
+                'vlan_id vlan-id
                 'address address
                 'bond (and master (get-field uuid master))
                 'hwaddr hwaddr)))
+
+
+    ;; Construct parent object.
+    (super-new)))
+
+
+;; Component that interprets desired state changes as instances of
+;; the classes defined above.  In other words, it manages networking.
+(define network-manager%
+  (class object%
+    ;; Known bonds, roles and network interfaces.
+    (field (bonds (make-hash))
+           (roles (make-hash))
+           (nics  (make-hash)))
+
+    ;; Network interfaces and roles that are to be assigned to bonds.
+    ;; Mapped by bond uuid, consulted when a new bond is added.
+    (field (bond-slaves (make-hash))
+           (bond-roles  (make-hash)))
+
+
+    ;; Create or update specified bond.
+    (define/public (setup-bond uuid config)
+      (let ((bond (hash-ref! bonds uuid (thunk (new bond% (uuid uuid))))))
+
+        ;; Set it's parameters.
+        (set-field! mode             bond (hash-ref config 'mode))
+        (set-field! lacp-rate        bond (hash-ref config 'lacp_rate))
+        (set-field! xmit-hash-policy bond (hash-ref config 'xmit_hash_policy))
+
+        ;; Update the configuration.
+        ;; If it has any slaves, it will be re-created with the parameters
+        ;; above.  Otherwise nothing will happen until first slave is added.
+        (send bond update)
+
+        ;; Assign any unassigned slaves destined for this bond.
+        (for ((slave (in-set (hash-ref bond-slaves uuid set))))
+          (unless (get-field master slave)
+            (when (get-field device-name slave)
+              (send bond add-slave slave))))
+
+        ;; Assign any unassigned roles destined for this bond.
+        (for ((role (in-set (hash-ref bond-roles uuid set))))
+          (unless (get-field master role)
+            (send bond add-role role)))))
+
+
+    ;; Delete specified bond.
+    ;; A no-op if the bond does not exist.
+    (define/public (remove-bond uuid config)
+      (let ((bond (hash-ref bonds uuid #f)))
+        (when bond
+          (hash-remove! bonds uuid)
+          (send bond destroy))))
+
+
+    ;; Create or update specified network interface.
+    (define/public (setup-nic hwaddr config)
+      (let* ((nic (hash-ref! nics hwaddr (thunk (new nic% (hwaddr hwaddr)))))
+             (master-uuid (hash-ref config 'bond))
+             (old-bond    (get-field master nic))
+             (new-bond    (hash-ref bonds master-uuid #f)))
+
+        ;; Update the collection of possible slaves.
+        (let ((slaves (hash-ref bond-slaves master-uuid set)))
+          (hash-set! bond-slaves master-uuid (set-add slaves nic)))
+
+        ;; If we know the device name, we need to consider enslavement.
+        (when (get-field device nic)
+          ;; Remove the nic from old bonding master, if needed.
+          (when old-bond
+            (unless (eq? old-bond new-bond)
+              (send old-bond remove-slave nic)))
+
+          ;; Add the NIC to the new bonding master, if configured.
+          (when new-bond
+            (send new-bond add-slave nic)))))
+
+
+    ;; Assign device name to a network interface.
+    ;; A new NIC object can be created just for this purpose.
+    (define/public (assign-nic-device hwaddr device-name)
+      (let ((nic (hash-ref! nics hwaddr (thunk (new nic% (hwaddr hwaddr))))))
+        ;; If the device is a member of a bond, remove it.
+        (let ((master (get-field master nic)))
+          (when master
+            (send master remove-slave nic)))
+
+        ;; Update the device name.
+        (set-field! device-name nic device-name)
+
+        ;; Assign the device to it's destined bond, if any.
+        (unless (get-field master nic)
+          (for (((master-uuid other-nic) (in-hash-pairs bond-slaves)))
+            (when (eq? other-nic nic)
+              (let ((bond (hash-ref bonds master-uuid #f)))
+                (when bond
+                  (send bond add-slave nic))))))))
+
+
+    ;; Remove device name assignment from specified network interface object.
+    (define/public (unassign-nic-device hwaddr)
+      (let ((nic (hash-ref nics hwaddr #f)))
+        (when nic
+          ;; Kill the NIC's membership in the bond.
+          (send nic destroy)
+
+          ;; Unassign the device name.
+          (set-field! device-name nic #f)
+
+          ;; Check if destined for any bond.
+          (unless (set-member?
+                    (foldl set-union (set) (hash-values bond-slaves)) nic)
+
+            ;; Remove it completely, it's not.
+            (hash-remove! nics hwaddr)))))
+
+
+    ;; Delete specified network interface.
+    (define/public (remove-nic hwaddr config)
+      (let ((nic (hash-ref nics hwaddr #f)))
+        (when nic
+          ;; Remove the nic from bond, etc...
+          (send nic destroy)
+
+          ;; Remove the nic from potential slaves.
+          (let* ((master-uuid (hash-ref config 'bond #f))
+                 (slaves      (hash-ref bond-slaves master-uuid set))
+                 (slaves      (set-remove slaves nic)))
+            (if (> (set-count slaves) 0)
+              (hash-set! bond-slaves master-uuid slaves)
+              (hash-remove! bond-slaves master-uuid)))
+
+          ;; If we don't have device name then we can forget the nic
+          ;; completely - it is not physically present.
+          (unless (get-field device nic)
+            (hash-remove! nics hwaddr)))))
+
+
+    ;; Create or update specified network role.
+    (define/public (setup-role uuid config)
+      (let* ((role (hash-ref! roles uuid (thunk (new role% (uuid uuid)))))
+             (master-uuid (hash-ref config 'bond))
+             (old-bond    (get-field master role))
+             (new-bond    (hash-ref bonds master-uuid #f)))
+
+        ;; Update the collection of possible roles.
+        (let ((roles (hash-ref bond-roles master-uuid set)))
+          (hash-set! bond-roles master-uuid (set-add roles role)))
+
+        ;; Remove the role from old bonding master.
+        (when old-bond
+          (unless (eq? old-bond new-bond)
+            (send old-bond remove-role role)))
+
+        ;; Add the role to the new bonding master, if configured.
+        (when new-bond
+          (send new-bond add-role role))))
+
+
+    ;; Delete specified network role.
+    (define/public (remove-role uuid config)
+      (let ((role (hash-ref roles uuid #f)))
+        (when role
+          ;; Remove the role from bond, etc...
+          (send role destroy)
+
+          ;; Remove the role from potential roles.
+          (let* ((master-uuid (hash-ref config 'bond #f))
+                 (roles       (hash-ref bond-roles master-uuid set))
+                 (roles       (set-remove roles role)))
+            (if (> (set-count roles) 0)
+              (hash-set! bond-roles master-uuid roles)
+              (hash-remove! bond-roles master-uuid)))
+
+          ;; Forget the role completely.
+          (hash-remove! roles uuid))))
 
 
     ;; Construct parent object.

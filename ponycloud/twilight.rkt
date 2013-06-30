@@ -39,18 +39,21 @@
                              (sink (curry dynamic-send this 'net-event))
                              (subsystem "net"))))
 
+    ;; Network manager, takes care of our interfaces.
+    (field (net-manager (new network-manager%)))
+
 
     ;; Called by net-monitor above.
-    (define/public (net-event action sysname)
-      (printf "net ~a ~s\n" action sysname))
+    (define/public (net-event action sysname hwaddr)
+      (printf "net ~a ~s ~s\n" action sysname hwaddr))
 
 
     (define/public (setup-entity entity id value)
       (printf "setup-entity ~s ~s ~s\n" entity id value))
 
 
-    (define/public (remove-entity entity id)
-      (printf "remove-entity ~s ~s\n" entity id))
+    (define/public (remove-entity entity id value)
+      (printf "remove-entity ~s ~s\n" entity id value))
 
 
     ;; Construct parent object.

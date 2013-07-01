@@ -1,6 +1,6 @@
 #lang racket/base
 ;
-;
+; Twilight <-> Sparkle Communication Component
 ;
 
 (require racket/contract

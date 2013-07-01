@@ -73,7 +73,7 @@
 
         ;; Re-enslave our slaves.
         (for ((slave (in-list slaves)))
-          (bond-slave-add bond-name (get-field device slave)))
+          (bond-slave-add bond-name (get-field device-name slave)))
 
         ;; Add the bond to our bridge.
         (bridge-port-add bridge-name bond-name))
@@ -93,7 +93,7 @@
         (error 'add-slave "nic is already enslaved"))
 
       ;; Fail when we do not know name of the NIC device yet.
-      (unless (get-field device nic)
+      (unless (get-field device-name nic)
         (error 'add-slave "nic is not present yet"))
 
       ;; Update it's master field.
@@ -230,7 +230,7 @@
     (init-field hwaddr)
 
     ;; Name of the network interface.
-    (init-field (device #f))
+    (init-field (device-name #f))
 
     ;; Bonding master.
     (field (master #f))
@@ -250,7 +250,6 @@
       ;; Notify about our current state.
       ((network-notify) 'nic hwaddr
         (hasheq 'hwaddr hwaddr
-                'device device
                 'bond (and master (get-field uuid master)))))
 
 
@@ -448,7 +447,7 @@
           (hash-set! bond-slaves master-uuid (set-add slaves nic)))
 
         ;; If we know the device name, we need to consider enslavement.
-        (when (get-field device nic)
+        (when (get-field device-name nic)
           ;; Remove the nic from old bonding master, if needed.
           (when old-bond
             (unless (eq? old-bond new-bond)
@@ -481,7 +480,7 @@
 
 
     ;; Remove device name assignment from specified network interface object.
-    (define/public (unassign-nic-device hwaddr)
+    (define/public (unassign-nic-device hwaddr device-name)
       (let ((nic (hash-ref nics hwaddr #f)))
         (when nic
           ;; Kill the NIC's membership in the bond.
@@ -515,7 +514,7 @@
 
           ;; If we don't have device name then we can forget the nic
           ;; completely - it is not physically present.
-          (unless (get-field device nic)
+          (unless (get-field device-name nic)
             (hash-remove! nics hwaddr)))))
 
 

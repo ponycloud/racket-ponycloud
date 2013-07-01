@@ -175,7 +175,7 @@
                 (hash-remove! local-state key))
 
               ;; Prepare the form required by the protocol.
-              (list entity id current new-data)))))
+              (list entity id "current" new-data)))))
 
       ;; Transmit the incremental changes.
       (send-changes processed-changes))

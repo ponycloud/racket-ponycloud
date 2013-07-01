@@ -21,6 +21,9 @@
     ;; Twilight instance that we work for.
     (init-field twilight)
 
+    ;; Copy uuid from Twilight as a convenience.
+    (field (uuid (get-field uuid twilight)))
+
     ;; Address of Sparkle to connect to.
     (field (connect-to (get-field connect-to twilight)))
 
@@ -56,7 +59,7 @@
 
     (define/private (send-changes changes)
       ;; Send a state exchange message.
-      (send-message (hasheq 'uuid (get-field uuid twilight)
+      (send-message (hasheq 'uuid uuid
                             'incarnation local-incarnation
                             'seq local-sequence
                             'event "twilight-state-update"
@@ -77,7 +80,7 @@
       ;; Ask Sparkle for complete dump of our configuration since the
       ;; incremental stream of changes have been disrupted or we are
       ;; just starting.
-      (send-message (hasheq 'uuid (get-field uuid twilight)
+      (send-message (hasheq 'uuid uuid
                             'event "twilight-resync")))
 
 
@@ -104,13 +107,13 @@
          (void))
 
         ;; Verify that we are talking to the same Sparkle instance.
-        ((string=? remote-incarnation (hash-ref message 'incarnation))
+        ((not (string=? remote-incarnation (hash-ref message 'incarnation)))
          (set! remote-incarnation (hash-ref message 'incarnation))
          (set! remote-sequence 0)
          (send-resync-request))
 
         ;; Verify that we did not miss any messages.
-        ((= remote-sequence (hash-ref message 'seq))
+        ((not (= remote-sequence (hash-ref message 'seq)))
          (set! remote-sequence 0)
          (send-resync-request))
 
@@ -171,8 +174,9 @@
       (define processed-changes
         (for/list ((change (in-list changes)))
           (let-values (((entity id new-data) (apply values change)))
-            (let* ((key     (cons entity id))
-                   (current (hash-ref local-state key #f)))
+            (let* ((new-data (hash-set new-data 'host uuid))
+                   (key      (cons entity id))
+                   (current  (hash-ref local-state key #f)))
 
               ;; Update the cache.
               (if new-data
@@ -188,9 +192,10 @@
 
     (begin
       ;; Yeah, we are alive.
-      (hash-set! local-state (cons "host" (get-field uuid twilight))
-                 (hasheq 'uuid (get-field uuid twilight)
-                         'state "present"))
+      (task
+        (send this publish/one "host" uuid
+                               (hasheq 'uuid uuid
+                                       'state "present")))
 
       ;; Send keep-alive every 15 seconds (plus one right away).
       (recurring-task 15

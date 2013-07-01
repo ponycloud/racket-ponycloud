@@ -75,7 +75,7 @@
       (send-message (hasheq 'uuid uuid
                             'incarnation local-incarnation
                             'seq local-sequence
-                            'event "twilight-state-update"
+                            'event "update"
                             'changes changes))
 
       ;; Bump local sequence number.
@@ -97,7 +97,7 @@
       ;; incremental stream of changes have been disrupted or we are
       ;; just starting.
       (send-message (hasheq 'uuid uuid
-                            'event "twilight-resync")))
+                            'event "resync")))
 
 
     (define/private (receive message time)
@@ -116,13 +116,13 @@
          (void))
 
         ;; Handle resync requests.
-        ((string=? "sparkle-resync" (hash-ref message 'event))
+        ((string=? "resync" (hash-ref message 'event))
          (set! local-sequence 0)
          (send-changes (for/list ((info (in-hash-pairs local-state)))
                          (flatten (list (car info) "current" (cdr info))))))
 
         ;; From here on, it's only desired state update.
-        ((not (string=? "sparkle-state-update" (hash-ref message 'event)))
+        ((not (string=? "update" (hash-ref message 'event)))
          (void))
 
         ;; Verify that we are talking to the same Sparkle instance.

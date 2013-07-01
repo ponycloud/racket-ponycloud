@@ -96,8 +96,8 @@
         ;; Handle resync requests.
         ((string=? "sparkle-resync" (hash-ref message 'event))
          (set! local-sequence 0)
-         (send-changes (for/list (((key value) (in-hash-pairs local-state)))
-                         (flatten (list key #f value)))))
+         (send-changes (for/list ((info (in-hash-pairs local-state)))
+                         (flatten (list (car info) "current" (cdr info))))))
 
         ;; From here on, it's only desired state update.
         ((not (string=? "sparkle-state-update" (hash-ref message 'event)))
@@ -146,7 +146,7 @@
     ;; Augment desired state with partial changes.
     (define/private (receive-changes changes)
       (for ((change (in-list changes)))
-        (let-values (((entity id old-data new-data) (apply values change)))
+        (let-values (((entity id part new-data) (apply values change)))
           (let* ((key     (cons entity id))
                  (current (hash-ref remote-state key #f)))
             (unless (equal? current new-data)
@@ -157,7 +157,7 @@
 
                 (begin
                   (hash-remove! remote-state key)
-                  (task (send twilight remove-entity entity id old-data)))))))))
+                  (task (send twilight remove-entity entity id current)))))))))
 
 
     (define/public (publish changes)
@@ -166,8 +166,8 @@
       (define processed-changes
         (for/list ((change (in-list changes)))
           (let-values (((entity id new-data) (apply values change)))
-            (let* ((key      (cons entity id))
-                   (old-data (hash-ref local-state key #f)))
+            (let* ((key     (cons entity id))
+                   (current (hash-ref local-state key #f)))
 
               ;; Update the cache.
               (if new-data
@@ -175,13 +175,18 @@
                 (hash-remove! local-state key))
 
               ;; Prepare the form required by the protocol.
-              (list entity id old-data new-data)))))
+              (list entity id current new-data)))))
 
       ;; Transmit the incremental changes.
       (send-changes processed-changes))
 
 
     (begin
+      ;; Yeah, we are alive.
+      (hash-set! local-state (cons "host" (get-field uuid twilight))
+                 (hasheq 'uuid (get-field uuid twilight)
+                         'state "present"))
+
       ;; Send keep-alive every 15 seconds (plus one right away).
       (recurring-task 15
         (keep-alive))

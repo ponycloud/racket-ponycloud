@@ -45,7 +45,12 @@
 
     ;; Called by net-monitor above.
     (define/public (net-event action sysname hwaddr)
-      (printf "net ~a ~s ~s\n" action sysname hwaddr))
+      (cond
+        ((eq? action 'add)
+         (send net-manager assign-nic-device hwaddr sysname))
+
+        ((eq? action 'remove)
+         (send net-manager unassign-nic-device hwaddr sysname))))
 
 
     (define/public (setup-entity entity id value)

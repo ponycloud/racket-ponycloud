@@ -45,12 +45,14 @@
 
     ;; Called by net-monitor above.
     (define/public (net-event action sysname hwaddr)
-      (cond
-        ((eq? action 'add)
-         (send net-manager assign-nic-device hwaddr sysname))
+      (parameterize ((network-notify
+                       (curry dynamic-send communicator 'publish/one)))
+        (cond
+          ((eq? action 'add)
+           (send net-manager assign-nic-device hwaddr sysname))
 
-        ((eq? action 'remove)
-         (send net-manager unassign-nic-device hwaddr sysname))))
+          ((eq? action 'remove)
+           (send net-manager unassign-nic-device hwaddr sysname)))))
 
 
     (define/public (setup-entity entity id value)

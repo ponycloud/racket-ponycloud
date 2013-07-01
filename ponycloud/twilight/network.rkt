@@ -204,7 +204,7 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify) 'bond uuid
+      ((network-notify) "bond" uuid
         (hasheq 'uuid uuid
                 'mode mode
                 'hwaddr hwaddr
@@ -248,9 +248,14 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify) 'nic hwaddr
+      ((network-notify) "nic" hwaddr
         (hasheq 'hwaddr hwaddr
                 'bond (and master (get-field uuid master)))))
+
+
+    (begin
+      ;; Notify about new nics.
+      (notify))
 
 
     ;; Construct parent object.
@@ -372,13 +377,18 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify) 'nic-role uuid
+      ((network-notify) "nic-role" uuid
         (hasheq 'uuid uuid
                 'name name
                 'vlan_id vlan-id
                 'address address
                 'bond (and master (get-field uuid master))
                 'hwaddr hwaddr)))
+
+
+    (begin
+      ;; Notify about new role.
+      (notify))
 
 
     ;; Construct parent object.

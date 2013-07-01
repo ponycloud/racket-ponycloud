@@ -160,6 +160,11 @@
                   (task (send twilight remove-entity entity id current)))))))))
 
 
+    (define/public (publish/one entity id value)
+      ;; Publish just one change.
+      (publish (list (list entity id value))))
+
+
     (define/public (publish changes)
       ;; Collect changes to send out while consulting
       ;; and updating the local state cache.

@@ -4,6 +4,8 @@
 ;
 
 (require racket/contract
+         racket/pretty
+         racket/string
          racket/class
          racket/list
          racket/set
@@ -14,6 +16,17 @@
 (require (planet williams/uuid/uuid))
 
 (provide (all-defined-out))
+
+
+;; Function that will be called for every sent and received message
+;; with ('in/'out payload) arguments to facilitate debugging.
+(define current-communicator-logger (make-parameter void))
+
+
+;; Communicator logger implementation that writes to stdout.
+(define (pretty-communicator-logger direction payload)
+  (printf "~a ~a\n" (if (eq? 'in direction) "<-" "->")
+                    (string-replace (pretty-format payload 76) "\n" "\n   ")))
 
 
 (define communicator%
@@ -70,6 +83,9 @@
 
 
     (define/private (send-message payload)
+      ;; Log outbound message.
+      ((current-communicator-logger) 'out payload)
+
       ;; Send payload to sparkle with current time.
       (socket-send socket "sparkle"
                           (jsexpr->bytes payload)
@@ -90,6 +106,9 @@
 
       ;; Deserialize the payload.
       (set! message (bytes->jsexpr message))
+
+      ;; Log inbound message.
+      ((current-communicator-logger) 'in message)
 
       (cond
         ;; Verify that the message is fresh enough.

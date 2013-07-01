@@ -14,9 +14,7 @@
 
 (define (get-device-mac device)
   (let ((id (udev-device-get-property-value device 'ID_NET_NAME_MAC)))
-    (if id
-      (string-join (regexp-match* ".." (substring id 3)) ":")
-      "XX:XX:XX:XX:XX:XX")))
+    (if id (string-join (regexp-match* ".." (substring id 3)) ":") #f)))
 
 
 (define udev-monitor%
@@ -45,10 +43,13 @@
         (udev-enumerate-scan-devices! enumerator)
 
         ;; Generate list of sysnames for all matches devices.
-        (for/list ((syspath (in-list (udev-enumerate-get enumerator))))
-          (let ((device (udev-device-new-from-syspath udev syspath)))
-            (list (udev-device-get-sysname device)
-                  (get-device-mac device))))))
+        (filter (lambda (info)
+                  (andmap values info))
+                (for/list ((syspath (in-list (udev-enumerate-get enumerator))))
+                  (let* ((device  (udev-device-new-from-syspath udev syspath))
+                         (sysname (udev-device-get-sysname device))
+                         (hwaddr  (get-device-mac device)))
+                    (list sysname hwaddr))))))
 
 
     (begin
@@ -66,9 +67,12 @@
 
       ;; Dispatch device events.
       (recurring-event-task (device (udev-monitor-evt monitor))
-        (sink (string->symbol (udev-device-get-action device))
-              (udev-device-get-sysname device)
-              (get-device-mac device))))
+        (let ((action  (udev-device-get-action device))
+              (sysname (udev-device-get-sysname device))
+              (hwaddr  (get-device-mac device)))
+          (when (and action sysname hwaddr)
+            (sink (string->symbol action) sysname hwaddr)))))
+
 
     ;; Construct parent object.
     (super-new)))

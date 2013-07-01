@@ -26,7 +26,7 @@
 
     ;; Connection to the Sparkle cloud controller.
     (field (socket (make-socket 'router
-                                #:identity (get-field uuid twilight)
+                                #:identity (uuid->string (make-uuid-4))
                                 #:connect (list connect-to))))
 
     ;; Incarnations of the local and remote changes streams.

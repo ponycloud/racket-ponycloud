@@ -105,7 +105,7 @@
       (set! time (string->number (bytes->string/utf-8 time)))
 
       ;; Deserialize the payload.
-      (set! message (bytes->jsexpr message))
+      (set! message (bytes->jsexpr message #:null #f))
 
       ;; Log inbound message.
       ((current-communicator-logger) 'in message)

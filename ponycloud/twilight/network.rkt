@@ -208,8 +208,8 @@
         (hasheq 'uuid uuid
                 'mode mode
                 'hwaddr hwaddr
-                'lacp_rate lacp-rate
-                'xmit_hash_policy xmit-hash-policy
+                'lacp_rate (or lacp-rate 'null)
+                'xmit_hash_policy (or xmit-hash-policy 'null)
                 'slaves (map (curry dynamic-get-field 'uuid) slaves)
                 'roles (map (curry dynamic-get-field 'uuid) roles))))
 
@@ -250,7 +250,7 @@
       ;; Notify about our current state.
       ((network-notify) "nic" hwaddr
         (hasheq 'hwaddr hwaddr
-                'bond (and master (get-field uuid master)))))
+                'bond (or (and master (get-field uuid master)) 'null))))
 
 
     (begin
@@ -380,9 +380,9 @@
       ((network-notify) "nic-role" uuid
         (hasheq 'uuid uuid
                 'name name
-                'vlan_id vlan-id
-                'address address
-                'bond (and master (get-field uuid master))
+                'vlan_id (or vlan-id 'null)
+                'address (or address 'null)
+                'bond (or (and master (get-field uuid master)) 'null)
                 'hwaddr hwaddr)))
 
 

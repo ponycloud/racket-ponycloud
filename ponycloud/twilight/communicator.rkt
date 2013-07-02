@@ -100,12 +100,12 @@
                             'event "resync")))
 
 
-    (define/private (receive message time)
+    (define/private (receive message-bytes time-bytes)
       ;; Get time as a number.
-      (set! time (string->number (bytes->string/utf-8 time)))
+      (define time (string->number (bytes->string/utf-8 time-bytes)))
 
       ;; Deserialize the payload.
-      (set! message (bytes->jsexpr message #:null #f))
+      (define message (bytes->jsexpr message-bytes #:null #f))
 
       ;; Log inbound message.
       ((current-communicator-logger) 'in message)

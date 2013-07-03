@@ -116,10 +116,12 @@
          (void))
 
         ;; Handle resync requests.
+        ;; We can safely ignore them if we have just complied.
         ((string=? "resync" (hash-ref message 'event))
-         (set! local-sequence 0)
-         (send-changes (for/list ((info (in-hash-pairs local-state)))
-                         (flatten (list (car info) "current" (cdr info))))))
+         (unless (= local-sequence 1)
+           (set! local-sequence 0)
+           (send-changes (for/list ((info (in-hash-pairs local-state)))
+                          (flatten (list (car info) "current" (cdr info)))))))
 
         ;; From here on, it's only desired state update.
         ((not (string=? "update" (hash-ref message 'event)))

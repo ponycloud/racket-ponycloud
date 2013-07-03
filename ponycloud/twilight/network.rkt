@@ -210,7 +210,7 @@
                 'hwaddr hwaddr
                 'lacp_rate (or lacp-rate 'null)
                 'xmit_hash_policy (or xmit-hash-policy 'null)
-                'slaves (map (curry dynamic-get-field 'uuid) slaves)
+                'slaves (map (curry dynamic-get-field 'hwaddr) slaves)
                 'roles (map (curry dynamic-get-field 'uuid) roles))))
 
 
@@ -377,7 +377,7 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((current-network-notify) "nic-role" uuid
+      ((current-network-notify) "nic_role" uuid
         (hasheq 'uuid uuid
                 'name name
                 'vlan_id (or vlan-id 'null)
@@ -543,6 +543,11 @@
         (when old-bond
           (unless (eq? old-bond new-bond)
             (send old-bond remove-role role)))
+
+        ;; Set role properties.
+        (set-field! name    role (hash-ref config 'role))
+        (set-field! vlan-id role (hash-ref config 'vlan_id))
+        (set-field! address role (hash-ref config 'address))
 
         ;; Add the role to the new bonding master, if configured.
         (when new-bond

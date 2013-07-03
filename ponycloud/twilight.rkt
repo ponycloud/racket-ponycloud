@@ -63,11 +63,29 @@
 
 
     (define/public (setup-entity entity id value)
-      (printf "setup-entity ~s ~s ~s\n" entity id value))
+      (parameterize ((current-network-notify network-notify))
+        (cond
+          ((equal? entity "nic")
+           (send net-manager setup-nic id value))
+
+          ((equal? entity "bond")
+           (send net-manager setup-bond id value))
+
+          ((equal? entity "nic_role")
+           (send net-manager setup-role id value)))))
 
 
     (define/public (remove-entity entity id value)
-      (printf "remove-entity ~s ~s\n" entity id value))
+      (parameterize ((current-network-notify network-notify))
+        (cond
+          ((equal? entity "nic")
+           (send net-manager remove-nic id value))
+
+          ((equal? entity "bond")
+           (send net-manager remove-bond id value))
+
+          ((equal? entity "nic_role")
+           (send net-manager remove-role id value)))))
 
 
     ;; Construct parent object.

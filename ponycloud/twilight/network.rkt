@@ -541,8 +541,7 @@
 
         ;; Remove the role from old bonding master.
         (when old-bond
-          (unless (eq? old-bond new-bond)
-            (send old-bond remove-role role)))
+          (send old-bond remove-role role))
 
         ;; Set role properties.
         (set-field! name    role (hash-ref config 'role))
@@ -551,8 +550,7 @@
 
         ;; Add the role to the new bonding master, if configured.
         (when new-bond
-          (unless (eq? old-bond new-bond)
-            (send new-bond add-role role)))))
+          (send new-bond add-role role))))
 
 
     ;; Delete specified network role.

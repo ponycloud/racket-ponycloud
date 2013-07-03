@@ -551,7 +551,8 @@
 
         ;; Add the role to the new bonding master, if configured.
         (when new-bond
-          (send new-bond add-role role))))
+          (unless (eq? old-bond new-bond)
+            (send new-bond add-role role)))))
 
 
     ;; Delete specified network role.

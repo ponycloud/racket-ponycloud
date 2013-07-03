@@ -17,7 +17,7 @@
 
 
 ;; Network entity changes notification function.
-(define network-notify (make-parameter void))
+(define current-network-notify (make-parameter void))
 
 
 ;; Configured bond (with it's private bridge).
@@ -204,7 +204,7 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify) "bond" uuid
+      ((current-network-notify) "bond" uuid
         (hasheq 'uuid uuid
                 'mode mode
                 'hwaddr hwaddr
@@ -248,7 +248,7 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify) "nic" hwaddr
+      ((current-network-notify) "nic" hwaddr
         (hasheq 'hwaddr hwaddr
                 'bond (or (and master (get-field uuid master)) 'null))))
 
@@ -377,7 +377,7 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((network-notify) "nic-role" uuid
+      ((current-network-notify) "nic-role" uuid
         (hasheq 'uuid uuid
                 'name name
                 'vlan_id (or vlan-id 'null)

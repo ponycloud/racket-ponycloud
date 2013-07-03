@@ -193,8 +193,7 @@
       (define processed-changes
         (for/list ((change (in-list changes)))
           (let-values (((entity id new-data) (apply values change)))
-            (let* ((new-data (hash-set new-data 'host uuid))
-                   (key      (cons entity id))
+            (let* ((key      (cons entity id))
                    (current  (hash-ref local-state key #f)))
 
               ;; Update the cache.

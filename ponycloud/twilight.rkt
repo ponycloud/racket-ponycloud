@@ -34,25 +34,32 @@
     ;; Component that communicates with Sparkle.
     (field (communicator (new communicator% (twilight this))))
 
-    ;; Udev network device monitor.
-    (field (net-monitor (new udev-monitor%
-                             (sink (curry dynamic-send this 'net-event))
-                             (subsystem "net"))))
-
     ;; Network manager, takes care of our interfaces.
     (field (net-manager (new network-manager%)))
 
 
+    ;; Serves as network changes notification callback.
+    ;; Enhances the information and forwards it to the communicator.
+    (define (network-notify entity id value)
+      (let ((value-with-host (and value (hash-set value 'host uuid))))
+        (send communicator publish/one entity id value-with-host)))
+
+
     ;; Called by net-monitor above.
-    (define/public (net-event action sysname hwaddr)
-      (parameterize ((network-notify
-                       (curry dynamic-send communicator 'publish/one)))
+    (define (network-event action sysname hwaddr)
+      (parameterize ((current-network-notify network-notify))
         (cond
           ((eq? action 'add)
            (send net-manager assign-nic-device hwaddr sysname))
 
           ((eq? action 'remove)
            (send net-manager unassign-nic-device hwaddr sysname)))))
+
+
+    ;; Udev network device monitor.
+    (field (net-monitor (new udev-monitor%
+                             (sink network-event)
+                             (subsystem "net"))))
 
 
     (define/public (setup-entity entity id value)

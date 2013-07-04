@@ -280,7 +280,8 @@
 
     (define/public (destroy)
       ;; Tell bond to get rid of this role's interfaces.
-      (send master remove-role this)
+      (when master
+        (send master remove-role this))
 
       ;; Notify user about the changes.
       (notify))

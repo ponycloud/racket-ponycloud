@@ -22,7 +22,7 @@
       libvirt)))
 
 
-
+;; Get host uuid from libvirt connection.
 (define (libvirt-uuid libvirt)
   (string-downcase
     (xexpr-path-text '(system entry (name "uuid") *)

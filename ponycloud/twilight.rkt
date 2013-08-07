@@ -48,7 +48,7 @@
         (send communicator publish/one entity id value-with-host)))
 
 
-    ;; Called by net-monitor above.
+    ;; Called by net-monitor below.
     (define (network-event action sysname hwaddr)
       (parameterize ((current-network-notify network-notify))
         (cond

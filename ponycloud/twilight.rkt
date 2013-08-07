@@ -5,15 +5,18 @@
 
 (require racket/contract
          racket/function
+         unstable/socket
          racket/class
          racket/match
-         xml/path
-         tasks
-         virt)
+         racket/list)
+
+(require libvirt
+         tasks)
 
 (require "twilight/util.rkt"
          "twilight/network.rkt"
          "twilight/udev.rkt"
+         "twilight/libvirt.rkt"
          "twilight/communicator.rkt")
 
 (provide (all-defined-out))
@@ -25,11 +28,11 @@
     ;; 0MQ URL of controller to connect to.
     (init-field connect-to)
 
-    ;; Libvirt / QEMU connection.
-    (field (qemu (virt-connect)))
+    ;; Libvirt connection.
+    (field (libvirt (libvirt-unix-client)))
 
     ;; UUID of this host.
-    (field (uuid (se-path* '(host uuid) (virt-capabilities qemu))))
+    (field (uuid (libvirt-uuid libvirt)))
 
     ;; Component that communicates with Sparkle.
     (field (communicator (new communicator% (twilight this))))

@@ -13,11 +13,11 @@
 (require libvirt
          tasks)
 
-(require "twilight/util.rkt"
-         "twilight/network.rkt"
-         "twilight/udev.rkt"
-         "twilight/libvirt.rkt"
-         "twilight/communicator.rkt")
+(require "private/util.rkt"
+         "private/network.rkt"
+         "private/udev.rkt"
+         "private/libvirt.rkt"
+         "private/communicator.rkt")
 
 (provide (all-defined-out))
 

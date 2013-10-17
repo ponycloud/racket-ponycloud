@@ -45,7 +45,7 @@
         ;; Generate list of sysnames for all matches devices.
         (filter (lambda (info)
                   (andmap values info))
-                (for/list ((syspath (in-list (udev-enumerate-get enumerator))))
+                (for/list ((syspath (udev-enumerate-get enumerator)))
                   (let* ((device  (udev-device-new-from-syspath udev syspath))
                          (sysname (udev-device-get-sysname device))
                          (hwaddr  (get-device-mac device)))
@@ -62,7 +62,7 @@
 
       (task
         ;; Replay existing devices once we start.
-        (for ((info (in-list (enumerate))))
+        (for ((info (enumerate)))
           (apply sink 'add info)))
 
       ;; Dispatch device events.

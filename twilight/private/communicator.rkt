@@ -120,8 +120,8 @@
         ((string=? "resync" (hash-ref message 'event))
          (unless (= local-sequence 1)
            (set! local-sequence 0)
-           (send-changes (for/list ((info (in-hash-pairs local-state)))
-                          (flatten (list (car info) "current" (cdr info)))))))
+           (send-changes (for/list (((k v) local-state))
+                           (flatten (list k "current" v))))))
 
         ;; From here on, it's only desired state update.
         ((not (string=? "update" (hash-ref message 'event)))
@@ -155,21 +155,21 @@
       ;; Determine what entities we have right now and what entities
       ;; have we received just now so that we can drop leftovers.
       (let ((old-set (list->set (hash-keys remote-state)))
-            (new-set (for/set ((change (in-list changes)))
-                       (cons (car change) (cadr change)))))
+            (new-set (for/set ((change changes))
+                       (cons (first change) (second change)))))
 
         ;; Receive the changes as usual.
         (receive-changes changes)
 
         ;; Now generate fake deletion changes for whatever we have left.
         (receive-changes
-          (for/list ((to-delete (in-set (set-subtract old-set new-set))))
+          (for/list ((to-delete (set-subtract old-set new-set)))
             (flatten (list to-delete (hash-ref remote-state to-delete) #f))))))
 
 
     ;; Augment desired state with partial changes.
     (define/private (receive-changes changes)
-      (for ((change (in-list changes)))
+      (for ((change changes))
         (let-values (((entity id part new-data) (apply values change)))
           (let* ((key     (cons entity id))
                  (current (hash-ref remote-state key #f)))
@@ -193,7 +193,7 @@
       ;; Collect changes to send out while consulting
       ;; and updating the local state cache.
       (define processed-changes
-        (for/list ((change (in-list changes)))
+        (for/list ((change changes))
           (let-values (((entity id new-data) (apply values change)))
             (let* ((key      (cons entity id))
                    (current  (hash-ref local-state key #f)))

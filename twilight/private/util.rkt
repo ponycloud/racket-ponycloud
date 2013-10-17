@@ -14,7 +14,7 @@
 
 (define (make-allocator prefix num-bytes)
   (generator ()
-    (for ((i (in-cycle (in-range (expt 16 num-bytes)))))
+    (for ((i (in-cycle (expt 16 num-bytes))))
       (let ((value (format "~a.~a" prefix (number->string i 16))))
         (yield value)))))
 
@@ -27,7 +27,7 @@
 (define (generate-hwaddr)
   (string-append
     "42:"
-    (string-join (for/list ((i (in-range 5))
+    (string-join (for/list ((i 5)
                             (octet (in-producer random #f 256)))
                    (~a (number->string octet 16)
                        #:width 2 #:left-pad-string "0" #:align 'right))

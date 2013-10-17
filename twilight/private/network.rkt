@@ -72,7 +72,7 @@
         (set-interface-up! bond-name #t)
 
         ;; Re-enslave our slaves.
-        (for ((slave (in-list slaves)))
+        (for ((slave slaves))
           (bond-slave-add bond-name (get-field device-name slave)))
 
         ;; Add the bond to our bridge.
@@ -183,14 +183,14 @@
 
     (define/public (destroy)
       ;; Free all the slaves.
-      (for ((slave (in-list slaves)))
+      (for ((slave slaves))
         (set-field! master slave #f))
 
       ;; Physically drop all slaves, thus removing the bond interface.
       (reset null)
 
       ;; Remove all the roles.
-      (for ((role (in-list roles)))
+      (for ((role roles))
         (remove-role role))
 
       ;; Drop bridge if it exists.
@@ -426,13 +426,13 @@
         (send bond update)
 
         ;; Assign any unassigned slaves destined for this bond.
-        (for ((slave (in-set (hash-ref bond-slaves uuid set))))
+        (for ((slave (hash-ref bond-slaves uuid set)))
           (unless (get-field master slave)
             (when (get-field device-name slave)
               (send bond add-slave slave))))
 
         ;; Assign any unassigned roles destined for this bond.
-        (for ((role (in-set (hash-ref bond-roles uuid set))))
+        (for ((role (hash-ref bond-roles uuid set)))
           (unless (get-field master role)
             (send bond add-role role)))))
 
@@ -483,7 +483,7 @@
 
         ;; Assign the device to it's destined bond, if any.
         (unless (get-field master nic)
-          (for (((master-uuid other-nic) (in-hash-pairs bond-slaves)))
+          (for (((master-uuid other-nic) bond-slaves))
             (when (eq? other-nic nic)
               (let ((bond (hash-ref bonds master-uuid #f)))
                 (when bond

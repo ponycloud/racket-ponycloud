@@ -5,21 +5,22 @@
 
 (require racket/contract
          racket/function
-         unstable/socket
+         racket/string
          racket/class
          racket/match
-         racket/list)
+         racket/list
+         unstable/socket)
 
 (require libvirt
-         tasks)
+         tasks
+         udev)
 
 (require "private/util.rkt"
          "private/network.rkt"
-         "private/udev.rkt"
          "private/libvirt.rkt"
          "private/communicator.rkt")
 
-(provide (all-defined-out))
+(provide twilight%)
 
 
 ;; Main object that takes care of platform management.
@@ -49,20 +50,18 @@
 
 
     ;; Called by net-monitor below.
-    (define (network-event action sysname hwaddr)
+    (define (network-event action name hwaddr)
       (parameterize ((current-network-notify network-notify))
         (cond
           ((eq? action 'add)
-           (send net-manager assign-nic-device hwaddr sysname))
+           (send net-manager assign-nic-device hwaddr name))
 
           ((eq? action 'remove)
-           (send net-manager unassign-nic-device hwaddr sysname)))))
+           (send net-manager unassign-nic-device hwaddr name)))))
 
 
-    ;; Udev network device monitor.
-    (field (net-monitor (new udev-monitor%
-                             (sink network-event)
-                             (subsystem "net"))))
+    (begin
+      (monitor-network-devices network-event))
 
 
     (define/public (setup-entity entity id value)
@@ -93,6 +92,39 @@
 
     ;; Construct parent object.
     (super-new)))
+
+
+(define (info-with-hwaddr? info)
+  (and (hash? info)
+       (hash-has-key? info 'ID_NET_NAME_MAC)))
+
+
+(define (hwaddr? addr)
+  (and (string? addr)
+       (regexp-match? #rx"^[a-f0-9][a-f0-9](:[a-f0-9][a-f0-9])*$" addr)))
+
+
+(define/contract (get-device-hwaddr info)
+                 (-> info-with-hwaddr? hwaddr?)
+  (let ((id (hash-ref info 'ID_NET_NAME_MAC)))
+    (string-join (regexp-match* ".." (substring id 3)) ":")))
+
+
+(define/contract (monitor-network-devices sink)
+                 (-> (-> (one-of/c 'add 'remove) string? hwaddr? void?) void?)
+  (task
+    (for (((syspath info) (list-devices #:subsystem "net")))
+      (when (info-with-hwaddr? info)
+        (let ((name   (hash-ref info 'INTERFACE))
+              (hwaddr (get-device-hwaddr info)))
+          (sink 'add name hwaddr)))))
+
+  (recurring-event-task (info (device-changed-evt #:subsystem "net"))
+    (when (info-with-hwaddr? info)
+      (let ((action (string->symbol (hash-ref info 'ACTION)))
+            (name   (hash-ref info 'INTERFACE))
+            (hwaddr (get-device-hwaddr info)))
+        (sink action name hwaddr)))))
 
 
 ; vim:set ts=2 sw=2 et:

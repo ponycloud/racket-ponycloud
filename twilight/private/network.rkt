@@ -196,7 +196,7 @@
         (remove-bridge bridge-name))
 
       ;; Notify user about the changes.
-      (notify))
+      ((current-notify) "bond" uuid #f))
 
 
     (define/public (notify)
@@ -240,7 +240,7 @@
         (send master remove-slave this))
 
       ;; Notify user about the changes.
-      (notify))
+      ((current-notify) "nic" hwaddr #f))
 
 
     (define/public (notify)
@@ -281,7 +281,7 @@
         (send master remove-role this))
 
       ;; Notify user about the changes.
-      (notify))
+      ((current-notify) "nic_role" uuid #f))
 
 
     (define/public (copy-interfaces role)

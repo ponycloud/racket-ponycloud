@@ -18,6 +18,7 @@
 (require "private/util.rkt"
          "private/common.rkt"
          "private/network.rkt"
+         "private/storage.rkt"
          "private/libvirt.rkt"
          "private/communicator.rkt")
 
@@ -39,56 +40,66 @@
     ;; Component that communicates with Sparkle.
     (field (communicator (new communicator% (twilight this))))
 
-    ;; Network manager, takes care of our interfaces.
-    (field (net-manager (new network-manager%)))
+    ;; Component that takes care of network interfaces.
+    (field (network-manager (new network-manager%)))
+
+    ;; Component that takes care of block devices.
+    (field (storage-manager (new storage-manager%)))
 
 
     ;; Serves as network changes notification callback.
     ;; Enhances the information and forwards it to the communicator.
-    (define (network-notify entity id value)
+    (define (communicator-notify entity id value)
       (let ((value-with-host (and value (hash-set value 'host uuid))))
         (send communicator publish/one entity id value-with-host)))
 
 
-    ;; Called by net-monitor below.
-    (define (network-event action name hwaddr)
-      (parameterize ((current-notify network-notify))
-        (cond
-          ((eq? action 'add)
-           (send net-manager assign-nic-device hwaddr name))
-
-          ((eq? action 'remove)
-           (send net-manager unassign-nic-device hwaddr name)))))
-
-
-    (begin
-      (monitor-network-devices network-event))
-
-
     (define/public (setup-entity entity id value)
-      (parameterize ((current-notify network-notify))
+      (parameterize ((current-notify communicator-notify))
         (cond
           ((equal? entity "nic")
-           (send net-manager setup-nic id value))
+           (send network-manager setup-nic id value))
 
           ((equal? entity "bond")
-           (send net-manager setup-bond id value))
+           (send network-manager setup-bond id value))
 
           ((equal? entity "nic_role")
-           (send net-manager setup-role id value)))))
+           (send network-manager setup-role id value)))))
 
 
     (define/public (remove-entity entity id value)
-      (parameterize ((current-notify network-notify))
+      (parameterize ((current-notify communicator-notify))
         (cond
           ((equal? entity "nic")
-           (send net-manager remove-nic id value))
+           (send network-manager remove-nic id value))
 
           ((equal? entity "bond")
-           (send net-manager remove-bond id value))
+           (send network-manager remove-bond id value))
 
           ((equal? entity "nic_role")
-           (send net-manager remove-role id value)))))
+           (send network-manager remove-role id value)))))
+
+
+    (begin
+      (monitor-network-devices
+        (lambda (action name hwaddr)
+          (parameterize ((current-notify communicator-notify))
+            (cond
+              ((eq? action 'add)
+               (send network-manager assign-nic-device hwaddr name))
+
+              ((eq? action 'remove)
+               (send network-manager unassign-nic-device hwaddr name))))))
+
+      (monitor-storage-devices
+        (lambda (action info)
+          (parameterize ((current-notify communicator-notify))
+            (cond
+              ((eq? action 'add)
+               (send storage-manager assign-disk-device info))
+
+              ((eq? action 'remove)
+               (send storage-manager unassign-disk-device info)))))))
 
 
     ;; Construct parent object.
@@ -98,6 +109,11 @@
 (define (info-with-hwaddr? info)
   (and (hash? info)
        (hash-has-key? info 'ID_NET_NAME_MAC)))
+
+
+(define (info-mpath? info)
+  (and (hash? info)
+       (regexp-match? #rx"^mpath-" (hash-ref info 'DM_UUID ""))))
 
 
 (define (hwaddr? addr)
@@ -126,6 +142,19 @@
             (name   (hash-ref info 'INTERFACE))
             (hwaddr (get-device-hwaddr info)))
         (sink action name hwaddr)))))
+
+
+(define/contract (monitor-storage-devices sink)
+                 (-> (-> (one-of/c 'add 'remove) hash? void?) void?)
+  (task
+    (for (((syspath info) (list-devices #:subsystem "block")))
+      (when (info-mpath? info)
+        (sink 'add info))))
+
+  (recurring-event-task (info (device-changed-evt #:subsystem "block"))
+    (when (info-mpath? info)
+      (let ((action (string->symbol (hash-ref info 'ACTION))))
+        (sink action info)))))
 
 
 ; vim:set ts=2 sw=2 et:

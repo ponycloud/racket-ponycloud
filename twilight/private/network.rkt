@@ -1,6 +1,6 @@
 #lang racket/base
 ;
-; Network Configuration Components
+; Network Configuration Component
 ;
 
 (require racket/contract

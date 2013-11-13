@@ -85,21 +85,21 @@
         (lambda (action name hwaddr)
           (parameterize ((current-notify communicator-notify))
             (cond
-              ((eq? action 'add)
-               (send network-manager assign-nic-device hwaddr name))
-
               ((eq? action 'remove)
-               (send network-manager unassign-nic-device hwaddr name))))))
+               (send network-manager unassign-nic-device hwaddr name))
+
+              (else
+               (send network-manager assign-nic-device hwaddr name))))))
 
       (monitor-storage-devices
         (lambda (action info)
           (parameterize ((current-notify communicator-notify))
             (cond
-              ((eq? action 'add)
-               (send storage-manager assign-disk-device info))
-
               ((eq? action 'remove)
-               (send storage-manager unassign-disk-device info)))))))
+               (send storage-manager unassign-disk-device info))
+
+              (else
+               (send storage-manager assign-disk-device info)))))))
 
 
     ;; Construct parent object.
@@ -128,7 +128,7 @@
 
 
 (define/contract (monitor-network-devices sink)
-                 (-> (-> (one-of/c 'add 'remove) string? hwaddr? void?) void?)
+                 (-> (-> symbol? string? hwaddr? void?) void?)
   (task
     (for (((syspath info) (list-devices #:subsystem "net")))
       (when (info-with-hwaddr? info)
@@ -145,7 +145,7 @@
 
 
 (define/contract (monitor-storage-devices sink)
-                 (-> (-> (one-of/c 'add 'remove) hash? void?) void?)
+                 (-> (-> symbol? hash? void?) void?)
   (task
     (for (((syspath info) (list-devices #:subsystem "block")))
       (when (info-mpath? info)

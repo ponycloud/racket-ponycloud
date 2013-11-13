@@ -9,7 +9,7 @@
 
 
 (define/contract current-notify
-                 (parameter/c (-> string? string? hash? void?))
+                 (parameter/c (-> string? string? (or/c hash? #f) void?))
   (make-parameter void))
 
 

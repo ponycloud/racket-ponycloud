@@ -16,6 +16,7 @@
          udev)
 
 (require "private/util.rkt"
+         "private/common.rkt"
          "private/network.rkt"
          "private/libvirt.rkt"
          "private/communicator.rkt")
@@ -51,7 +52,7 @@
 
     ;; Called by net-monitor below.
     (define (network-event action name hwaddr)
-      (parameterize ((current-network-notify network-notify))
+      (parameterize ((current-notify network-notify))
         (cond
           ((eq? action 'add)
            (send net-manager assign-nic-device hwaddr name))
@@ -65,7 +66,7 @@
 
 
     (define/public (setup-entity entity id value)
-      (parameterize ((current-network-notify network-notify))
+      (parameterize ((current-notify network-notify))
         (cond
           ((equal? entity "nic")
            (send net-manager setup-nic id value))
@@ -78,7 +79,7 @@
 
 
     (define/public (remove-entity entity id value)
-      (parameterize ((current-network-notify network-notify))
+      (parameterize ((current-notify network-notify))
         (cond
           ((equal? entity "nic")
            (send net-manager remove-nic id value))

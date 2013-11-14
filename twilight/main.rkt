@@ -56,37 +56,29 @@
 
     (define/public (setup-entity entity id value)
       (parameterize ((current-notify communicator-notify))
-        (cond
-          ((equal? entity "nic")
-           (send network-manager setup-nic id value))
-
-          ((equal? entity "bond")
-           (send network-manager setup-bond id value))
-
-          ((equal? entity "nic_role")
-           (send network-manager setup-role id value)))))
+        (match entity
+          ("nic"      (send network-manager setup-nic id value))
+          ("bond"     (send network-manager setup-bond id value))
+          ("nic_role" (send network-manager setup-role id value))
+          ("disk"     (send storage-manager setup-disk id value)))))
 
 
     (define/public (remove-entity entity id value)
       (parameterize ((current-notify communicator-notify))
-        (cond
-          ((equal? entity "nic")
-           (send network-manager remove-nic id value))
-
-          ((equal? entity "bond")
-           (send network-manager remove-bond id value))
-
-          ((equal? entity "nic_role")
-           (send network-manager remove-role id value)))))
+        (match entity
+          ("nic"      (send network-manager remove-nic id value))
+          ("bond"     (send network-manager remove-bind id value))
+          ("nic_role" (send network-manager remove-role id value))
+          ("disk"     (send storage-manager remove-disk id value)))))
 
 
     (begin
       (monitor-network-devices
         (lambda (action name hwaddr)
           (parameterize ((current-notify communicator-notify))
-            (cond
-              ((eq? action 'remove)
-               (send network-manager unassign-nic-device hwaddr name))
+            (match action
+              ('remove
+               (send network-manager unassign-disk-device hwaddr name))
 
               (else
                (send network-manager assign-nic-device hwaddr name))))))
@@ -94,8 +86,8 @@
       (monitor-storage-devices
         (lambda (action info)
           (parameterize ((current-notify communicator-notify))
-            (cond
-              ((eq? action 'remove)
+            (match action
+              ('remove
                (send storage-manager unassign-disk-device info))
 
               (else

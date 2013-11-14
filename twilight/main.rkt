@@ -51,7 +51,7 @@
     ;; Enhances the information and forwards it to the communicator.
     (define (communicator-notify entity id value)
       (let ((value-with-host (and value (hash-set value 'host uuid))))
-        (send communicator publish/one entity id value-with-host)))
+        (send communicator publish/one entity id (or value-with-host 'null))))
 
 
     (define/public (setup-entity entity id value)

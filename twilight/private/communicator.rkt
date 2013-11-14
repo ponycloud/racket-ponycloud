@@ -13,7 +13,7 @@
          json
          zmq)
 
-(require (planet williams/uuid/uuid))
+(require williams/uuid1/uuid)
 
 (provide (all-defined-out))
 

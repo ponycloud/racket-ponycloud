@@ -7,7 +7,7 @@
          racket/contract
          unstable/socket)
 
-(require xml/xexpr-path
+(require xexpr-path
          libvirt)
 
 (provide (all-defined-out))

@@ -60,7 +60,6 @@
           ("nic"      (send network-manager setup-nic id value))
           ("bond"     (send network-manager setup-bond id value))
           ("nic_role" (send network-manager setup-role id value))
-          ("disk"     (send storage-manager setup-disk id value))
           (else       (printf "setup-entity ~s not implemented\n" entity)))))
 
 
@@ -70,7 +69,6 @@
           ("nic"      (send network-manager remove-nic id value))
           ("bond"     (send network-manager remove-bind id value))
           ("nic_role" (send network-manager remove-role id value))
-          ("disk"     (send storage-manager remove-disk id value))
           (else       (printf "remove-entity ~s not implemented\n" entity)))))
 
 

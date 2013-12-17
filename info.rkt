@@ -1,5 +1,6 @@
 #lang setup/infotab
 
+(define collection 'multi)
 (define deps '("sysfs" "rtnl" "udev" "libvirt" "zmq" "tasks"
                "xexpr-path" "planet-williams-uuid1" "planet-soegaard-digest1"))
 

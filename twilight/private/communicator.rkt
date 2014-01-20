@@ -56,6 +56,11 @@
     (field (local-sequence  1)
            (remote-sequence 0))
 
+    ;; Flag indicating that our outgoing stream have been synchronized
+    ;; and we can send incremental changes.  Happens after we send an
+    ;; initial message.
+    (field (synchronized? #f))
+
     ;; Collection of current states of local entities.
     ;; Gets updated by the public method (publish changes).
     (field (local-state (make-hash)))
@@ -120,6 +125,7 @@
         ((string=? "resync" (hash-ref message 'event))
          (unless (= local-sequence 1)
            (set! local-sequence 0)
+           (set! synchronized? #t)
            (send-changes (for/list (((k v) local-state))
                            (flatten (list k "current" v))))))
 
@@ -206,16 +212,16 @@
               ;; Prepare the form required by the protocol.
               (list entity id "current" new-data)))))
 
-      ;; Transmit the incremental changes.
-      (send-changes processed-changes))
+      ;; After we replicate whole current state we can start sending
+      ;; differences as they are published.
+      (when synchronized?
+        (send-changes processed-changes)))
 
 
     (begin
       ;; Yeah, we are alive.
       (task
-        (send this publish/one "host" uuid
-                               (hasheq 'uuid uuid
-                                       'state "present")))
+        (publish/one "host" uuid (hasheq 'uuid uuid 'status "present")))
 
       ;; Send keep-alive every 15 seconds (plus one right away).
       (recurring-task 15

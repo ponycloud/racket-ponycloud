@@ -139,15 +139,15 @@
          (set! remote-sequence 0)
          (send-resync-request))
 
-        ;; Verify that we did not miss any messages.
-        ((not (= remote-sequence (hash-ref message 'seq)))
-         (set! remote-sequence 0)
-         (send-resync-request))
-
         ;; Treat full resync specially.
         ((= remote-sequence 0)
          (receive-changes/full (hash-ref message 'changes))
          (set! remote-sequence (add1 remote-sequence)))
+
+        ;; Verify that we did not miss any messages.
+        ((not (= remote-sequence (hash-ref message 'seq)))
+         (set! remote-sequence 0)
+         (send-resync-request))
 
         ;; Finally, handle incremental desired state changes.
         (else

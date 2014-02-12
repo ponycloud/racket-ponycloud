@@ -127,7 +127,7 @@
            (set! local-sequence 0)
            (set! synchronized? #t)
            (send-changes (for/list (((k v) local-state))
-                           (flatten (list k "current" v))))))
+                           (append k (list "current" v))))))
 
         ;; From here on, it's only desired state update.
         ((not (string=? "update" (hash-ref message 'event)))
@@ -162,7 +162,7 @@
       ;; have we received just now so that we can drop leftovers.
       (let ((old-set (list->set (hash-keys remote-state)))
             (new-set (for/set ((change changes))
-                       (cons (first change) (second change)))))
+                       (list (first change) (second change)))))
 
         ;; Receive the changes as usual.
         (receive-changes changes)
@@ -177,7 +177,7 @@
     (define/private (receive-changes changes)
       (for ((change changes))
         (let-values (((entity id part new-data) (apply values change)))
-          (let* ((key     (cons entity id))
+          (let* ((key     (list entity id))
                  (current (hash-ref remote-state key #f)))
             (unless (equal? current new-data)
               (if new-data
@@ -201,7 +201,7 @@
       (define processed-changes
         (for/list ((change changes))
           (let-values (((entity id new-data) (apply values change)))
-            (let* ((key      (cons entity id))
+            (let* ((key      (list entity id))
                    (current  (hash-ref local-state key #f)))
 
               ;; Update the cache.

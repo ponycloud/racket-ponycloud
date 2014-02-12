@@ -397,6 +397,9 @@
 ;; the classes defined above.  In other words, it manages networking.
 (define network-manager%
   (class object%
+    ;; Reference to the Twilight instance that spawned us.
+    (init-field twilight)
+
     ;; Known bonds, roles and network interfaces.
     (field (bonds (make-hash))
            (roles (make-hash))

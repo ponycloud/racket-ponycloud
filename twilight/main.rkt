@@ -41,10 +41,10 @@
     (field (communicator (new communicator% (twilight this))))
 
     ;; Component that takes care of network interfaces.
-    (field (network-manager (new network-manager%)))
+    (field (network-manager (new network-manager% (twilight this))))
 
     ;; Component that takes care of block devices.
-    (field (storage-manager (new storage-manager%)))
+    (field (storage-manager (new storage-manager% (twilight this))))
 
 
     ;; Serves as network changes notification callback.
@@ -57,19 +57,25 @@
     (define/public (setup-entity entity id value)
       (parameterize ((current-notify communicator-notify))
         (match entity
-          ("nic"      (send network-manager setup-nic id value))
-          ("bond"     (send network-manager setup-bond id value))
-          ("nic_role" (send network-manager setup-role id value))
-          (else       (printf "setup-entity ~s not implemented\n" entity)))))
+          ("nic"          (send network-manager setup-nic id value))
+          ("bond"         (send network-manager setup-bond id value))
+          ("nic_role"     (send network-manager setup-role id value))
+          ("storage_pool" (send storage-manager pool-configure value))
+          ("disk"         (send storage-manager disk-configure value))
+          (else
+            (printf "setup-entity ~s not implemented\n" entity)))))
 
 
     (define/public (remove-entity entity id value)
       (parameterize ((current-notify communicator-notify))
         (match entity
-          ("nic"      (send network-manager remove-nic id value))
-          ("bond"     (send network-manager remove-bind id value))
-          ("nic_role" (send network-manager remove-role id value))
-          (else       (printf "remove-entity ~s not implemented\n" entity)))))
+          ("nic"          (send network-manager remove-nic id value))
+          ("bond"         (send network-manager remove-bond id value))
+          ("nic_role"     (send network-manager remove-role id value))
+          ("storage_pool" (send storage-manager pool-deconfigure value))
+          ("disk"         (send storage-manager disk-deconfigure value))
+          (else
+            (printf "remove-entity ~s not implemented\n" entity)))))
 
 
     (begin
@@ -78,7 +84,7 @@
           (parameterize ((current-notify communicator-notify))
             (match action
               ('remove
-               (send network-manager unassign-disk-device hwaddr name))
+               (send network-manager unassign-nic-device hwaddr name))
 
               (else
                (send network-manager assign-nic-device hwaddr name))))))
@@ -88,10 +94,10 @@
           (parameterize ((current-notify communicator-notify))
             (match action
               ('remove
-               (send storage-manager unassign-disk-device info))
+               (send storage-manager disk-blkdev-removed info))
 
               (else
-               (send storage-manager assign-disk-device info)))))))
+               (send storage-manager disk-blkdev-changed info)))))))
 
 
     ;; Construct parent object.

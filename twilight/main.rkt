@@ -80,7 +80,7 @@
 
     (begin
       (monitor-network-devices
-        (lambda (action name hwaddr)
+        (λ (action name hwaddr)
           (parameterize ((current-notify communicator-notify))
             (match action
               ('remove
@@ -90,7 +90,7 @@
                (send network-manager assign-nic-device hwaddr name))))))
 
       (monitor-storage-devices
-        (lambda (action info)
+        (λ (action info)
           (parameterize ((current-notify communicator-notify))
             (match action
               ('remove

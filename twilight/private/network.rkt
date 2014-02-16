@@ -4,7 +4,6 @@
 ;
 
 (require racket/contract
-         racket/function
          racket/class
          racket/set
          sysfs/net
@@ -130,7 +129,7 @@
         (error 'add-role "role already has a master bond"))
 
       ;; Find existing role with the same VLAN tag.
-      (let ((similar (filter (curry dynamic-send role 'same-vlan?) roles)))
+      (let ((similar (filter (λ (r) (send role same-vlan? r)) roles)))
         (if (null? similar)
           (begin
             ;; Create role interfaces.
@@ -160,13 +159,13 @@
       (set! roles (remove role roles))
 
       ;; Find other roles with the same IP address.
-      (let ((similar (filter (curry dynamic-send role 'same-address?) roles)))
+      (let ((similar (filter (λ (r) (send role same-address? r)) roles)))
         (when (null? similar)
           ;; No other interface needs the address.
           (send role remove-address)))
 
       ;; Find other roles with the same VLAN tag.
-      (let ((similar (filter (curry dynamic-send role 'same-vlan?) roles)))
+      (let ((similar (filter (λ (r) (send role same-vlan?)) roles)))
         (if (null? similar)
           ;; No other roles need the VLAN and bridge, clean up.
           (send role destroy-interfaces)
@@ -207,8 +206,8 @@
                 'hwaddr hwaddr
                 'lacp_rate (or lacp-rate 'null)
                 'xmit_hash_policy (or xmit-hash-policy 'null)
-                'slaves (map (curry dynamic-get-field 'hwaddr) slaves)
-                'roles (map (curry dynamic-get-field 'uuid) roles))))
+                'slaves (map (λ (s) (get-field hwaddr s)) slaves)
+                'roles (map (λ (r) (get-field uuid r)) roles))))
 
 
     (begin
@@ -413,7 +412,7 @@
 
     ;; Create or update specified bond.
     (define/public (setup-bond uuid config)
-      (let ((bond (hash-ref! bonds uuid (thunk (new bond% (uuid uuid))))))
+      (let ((bond (hash-ref! bonds uuid (λ _ (new bond% (uuid uuid))))))
 
         ;; Set it's parameters.
         (set-field! mode             bond (hash-ref config 'mode))
@@ -448,7 +447,7 @@
 
     ;; Create or update specified network interface.
     (define/public (setup-nic hwaddr config)
-      (let* ((nic (hash-ref! nics hwaddr (thunk (new nic% (hwaddr hwaddr)))))
+      (let* ((nic (hash-ref! nics hwaddr (λ _ (new nic% (hwaddr hwaddr)))))
              (master-uuid (hash-ref config 'bond))
              (old-bond    (get-field master nic))
              (new-bond    (hash-ref bonds master-uuid #f)))
@@ -472,7 +471,7 @@
     ;; Assign device name to a network interface.
     ;; A new NIC object can be created just for this purpose.
     (define/public (assign-nic-device hwaddr device-name)
-      (let ((nic (hash-ref! nics hwaddr (thunk (new nic% (hwaddr hwaddr))))))
+      (let ((nic (hash-ref! nics hwaddr (λ _ (new nic% (hwaddr hwaddr))))))
         ;; If the device is a member of a bond, remove it.
         (let ((master (get-field master nic)))
           (when master
@@ -531,7 +530,7 @@
 
     ;; Create or update specified network role.
     (define/public (setup-role uuid config)
-      (let* ((role (hash-ref! roles uuid (thunk (new role% (uuid uuid)))))
+      (let* ((role (hash-ref! roles uuid (λ _ (new role% (uuid uuid)))))
              (master-uuid (hash-ref config 'bond))
              (old-bond    (get-field master role))
              (new-bond    (hash-ref bonds master-uuid #f)))

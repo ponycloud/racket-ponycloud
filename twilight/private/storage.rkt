@@ -4,7 +4,6 @@
 ;
 
 (require racket/contract
-         racket/function
          racket/class
          racket/match
          racket/path
@@ -198,13 +197,13 @@
     ;; Find an existing or create a new host-disk% instance.
     (define/private (find-host-disk pkey)
       (let ((key (list "host_disk" pkey)))
-        (hash-ref entities key (thunk (new host-disk% (pkey pkey))))))
+        (hash-ref entities key (λ _ (new host-disk% (pkey pkey))))))
 
 
     ;; Find an existing or create a new storage-pool% instance.
     (define/private (find-storage-pool pkey)
       (let ((key (list "storage_pool" pkey)))
-        (hash-ref entities key (thunk (make-storage-pool pkey)))))
+        (hash-ref entities key (λ _ (make-storage-pool pkey)))))
 
 
     ;; Process block device create/update event from udev.

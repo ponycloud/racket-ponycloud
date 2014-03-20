@@ -4,6 +4,7 @@
 ;
 
 (require racket/contract
+         racket/sequence
          racket/class
          racket/match
          racket/path
@@ -86,7 +87,7 @@
     (define/augment (status)
       (hasheq 'storage_pool (or storage-pool 'null)
               'disk (second pkey)
-              'size (floor (/ blkdev-size (expt 2 20)))))
+              'size (and blkdev-size (floor (/ blkdev-size (expt 2 20))))))
 
 
     ;; Construct parent object.
@@ -147,7 +148,7 @@
 
     ;; Base pool availability on availability of it's individual disks.
     (define/augment (status)
-      (let ((ready? (andmap (cut send <> ready?) disks)))
+      (let ((ready? (sequence-andmap (cut send <> ready?) disks)))
         (hasheq 'uuid pkey
                 'status (if ready? "ready" "pending"))))
 
@@ -193,6 +194,10 @@
     (define/private (storage-pool-conf-pkey info)
       (hash-ref info 'uuid))
 
+    ;; Extract storage-pool% type from configuration.
+    (define/private (storage-pool-conf-type info)
+      (hash-ref info 'type))
+
 
     ;; Find an existing or create a new host-disk% instance.
     (define/private (find-host-disk pkey)
@@ -201,9 +206,11 @@
 
 
     ;; Find an existing or create a new storage-pool% instance.
-    (define/private (find-storage-pool pkey)
-      (let ((key (list "storage_pool" pkey)))
-        (hash-ref entities key (λ _ (make-storage-pool pkey)))))
+    (define/private (find-storage-pool info)
+      (let ((pkey (storage-pool-conf-pkey info))
+            (type (storage-pool-conf-type info)))
+        (let ((key (list "storage_pool" pkey)))
+          (hash-ref entities key (λ _ (make-storage-pool type pkey))))))
 
 
     ;; Process block device create/update event from udev.
@@ -232,13 +239,13 @@
 
     ;; Configure storage-pool using supplied information.
     (define/public (pool-configure info)
-      (using (find-storage-pool (storage-pool-conf-pkey info))
+      (using (find-storage-pool info)
         (configure <it> info)))
 
 
     ;; Remove configuration of a storage pool.
     (define/public (pool-deconfigure info)
-      (using (find-storage-pool (storage-pool-conf-pkey info))
+      (using (find-storage-pool info)
         (deconfigure <it>)))
 
 

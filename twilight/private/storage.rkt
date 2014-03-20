@@ -23,7 +23,7 @@
          storage-manager/c)
 
 
-(define/contract host-disk%
+(define/contract disk%
                  entity/c
   (class entity%
     ;; Inherit the primary key, we are going to need it for `(get-key)`.
@@ -48,7 +48,7 @@
 
     ;; Return unique entity key.
     (define/override (get-key)
-      (list "host_disk" pkey))
+      (list "disk" pkey))
 
 
     ;; Extract current state from block device details.
@@ -85,8 +85,8 @@
 
     ;; Report back with the storage pool the disk is assigned to.
     (define/augment (status)
-      (hasheq 'storage_pool (or storage-pool 'null)
-              'disk (second pkey)
+      (hasheq 'id pkey
+              'storage_pool (or storage-pool 'null)
               'size (and blkdev-size (floor (/ blkdev-size (expt 2 20))))))
 
 
@@ -132,7 +132,7 @@
 
     ;; Allow receival of disk events.
     (define/override (interested? other)
-      (is-a? other host-disk%))
+      (is-a? other disk%))
 
 
     ;; Add the disk to the set if intended for this storage pool.
@@ -179,15 +179,13 @@
     (inherit configure deconfigure appear disappear)
 
 
-    ;; Extract host-disk% primary key from udev info.
-    (define/private (host-disk-udev-pkey info)
-      (list (get-field uuid twilight)
-            (regexp-replace #rx"^mpath-" (hash-ref info 'DM_UUID) "")))
+    ;; Extract disk% primary key from udev info.
+    (define/private (disk-udev-pkey info)
+      (regexp-replace #rx"^mpath-" (hash-ref info 'DM_UUID) ""))
 
-    ;; Extract host-disk% primary key from configuration.
-    (define/private (host-disk-conf-pkey info)
-      (list (get-field uuid twilight)
-            (hash-ref info 'id)))
+    ;; Extract disk% primary key from configuration.
+    (define/private (disk-conf-pkey info)
+      (hash-ref info 'id))
 
 
     ;; Extract storage-pool% primary key from configuration.
@@ -199,10 +197,10 @@
       (hash-ref info 'type))
 
 
-    ;; Find an existing or create a new host-disk% instance.
-    (define/private (find-host-disk pkey)
-      (let ((key (list "host_disk" pkey)))
-        (hash-ref entities key (λ _ (new host-disk% (pkey pkey))))))
+    ;; Find an existing or create a new disk% instance.
+    (define/private (find-disk pkey)
+      (let ((key (list "disk" pkey)))
+        (hash-ref entities key (λ _ (new disk% (pkey pkey))))))
 
 
     ;; Find an existing or create a new storage-pool% instance.
@@ -215,25 +213,25 @@
 
     ;; Process block device create/update event from udev.
     (define/public (disk-blkdev-changed info)
-      (using (find-host-disk (host-disk-udev-pkey info))
+      (using (find-disk (disk-udev-pkey info))
         (appear <it> info)))
 
 
     ;; Process block device removal event from udev.
     (define/public (disk-blkdev-removed info)
-      (using (find-host-disk (host-disk-udev-pkey info))
+      (using (find-disk (disk-udev-pkey info))
         (disappear <it>)))
 
 
-    ;; Configure host-disk using disk information.
+    ;; Configure disk% using desired state.
     (define/public (disk-configure info)
-      (using (find-host-disk (host-disk-conf-pkey info))
+      (using (find-disk (disk-conf-pkey info))
         (configure <it> info)))
 
 
-    ;; Deconfigure host-disk on withdrawal of disk configuration.
+    ;; Deconfigure disk on withdrawal of configuration.
     (define/public (disk-deconfigure info)
-      (using (find-host-disk (host-disk-conf-pkey info))
+      (using (find-disk (disk-conf-pkey info))
         (deconfigure <it>)))
 
 

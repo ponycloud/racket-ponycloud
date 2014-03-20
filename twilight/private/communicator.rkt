@@ -6,6 +6,7 @@
 (require racket/contract
          racket/pretty
          racket/string
+         racket/match
          racket/class
          racket/list
          racket/set
@@ -127,7 +128,7 @@
            (set! local-sequence 0)
            (set! synchronized? #t)
            (send-changes (for/list (((k v) local-state))
-                           (append k (list "current" v))))))
+                           (mangle (first k) (second k) v)))))
 
         ;; From here on, it's only desired state update.
         ((not (string=? "update" (hash-ref message 'event)))
@@ -200,22 +201,58 @@
       ;; and updating the local state cache.
       (define processed-changes
         (for/list ((change changes))
-          (let-values (((entity id new-data) (apply values change)))
-            (let* ((key      (list entity id))
-                   (current  (hash-ref local-state key #f)))
-
-              ;; Update the cache.
-              (if new-data
-                (hash-set! local-state key new-data)
-                (hash-remove! local-state key))
-
-              ;; Prepare the form required by the protocol.
-              (list entity id "current" new-data)))))
+          (process-change change)))
 
       ;; After we replicate whole current state we can start sending
       ;; differences as they are published.
       (when synchronized?
         (send-changes processed-changes)))
+
+
+    ;; Cache the change and potentially mangle the output,
+    ;; producing a valid change to be sent over the network.
+    (define/private (process-change change)
+      (match change
+        ((list entity id new-data)
+         (let* ((key (list entity id))
+                (current (hash-ref local-state key #f)))
+           ;; Update the cache.
+           (if new-data
+               (hash-set! local-state key new-data)
+               (hash-remove! local-state key))
+
+           ;; Convert to form required by the network protocol.
+           (mangle entity id new-data)))))
+
+
+    ;; Produce list-form of the current state change with properly
+    ;; mangled disks, storage pools, volumes, and instances to
+    ;; host_disks, host_storage_pools et cetera.
+    (define/private (mangle entity id data)
+      (define (modify old-key new-key)
+        (and data
+             (let ((key-value (hash-ref data old-key)))
+               (hash-set (hash-remove data old-key)
+                         new-key key-value))))
+
+      (define (make-id . keys)
+        (map (λ (k) (hash-ref data k)) keys))
+
+      (match entity
+        ("disk"
+         (list "host_disk"
+               (make-id 'host 'id)
+               "current"
+               (modify 'id 'disk)))
+
+        ("storage_pool"
+         (list "host_storage_pool"
+               (make-id 'host 'uuid)
+               "current"
+               (modify 'uuid 'storage_pool)))
+
+        (else
+         (list entity id "current" data))))
 
 
     (begin

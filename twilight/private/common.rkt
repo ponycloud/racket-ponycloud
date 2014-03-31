@@ -18,7 +18,7 @@
 
 
 (define/contract (notify-sparkle entity id info)
-                 (-> string? pkey/c hash? void?)
+                 (-> string? pkey/c (or/c hash? #f) void?)
   ((current-notify) entity id info))
 
 

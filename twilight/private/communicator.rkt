@@ -10,6 +10,7 @@
          racket/class
          racket/list
          racket/set
+         srfi/43
          tasks
          json
          zmq)
@@ -28,6 +29,15 @@
 (define (pretty-communicator-logger direction payload)
   (printf "~a ~a\n" (if (eq? 'in direction) "<-" "->")
                     (string-replace (pretty-format payload 76) "\n" "\n   ")))
+
+
+;; Retrieve dependency score for given change.
+;; Some change types should be incorporated before others,
+;; this is a simple dependency management using type for ordering.
+(define (score-change c)
+  (define order
+    #("nic" "bond" "nic_role" "disk" "storage_pool" "image" "extent" "volume"))
+  (or (vector-index (car c) order) +inf.0))
 
 
 (define communicator%
@@ -176,7 +186,7 @@
 
     ;; Augment desired state with partial changes.
     (define/private (receive-changes changes)
-      (for ((change changes))
+      (for ((change (sort changes < score-change)))
         (let-values (((entity id part new-data) (apply values change)))
           (let* ((key     (list entity id))
                  (current (hash-ref remote-state key #f)))

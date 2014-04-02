@@ -11,6 +11,7 @@
          racket/list
          racket/set
          srfi/43
+         srfi/26
          tasks
          json
          zmq)
@@ -36,8 +37,16 @@
 ;; this is a simple dependency management using type for ordering.
 (define (score-change c)
   (define order
-    #("nic" "bond" "nic_role" "disk" "storage_pool" "image" "extent" "volume"))
-  (or (vector-index (car c) order) +inf.0))
+    #("nic" "bond" "nic_role" "disk" "storage_pool" "image" "extent"
+      "volume" "volume"))
+
+  (match c
+    ((list "volume" _ _ (hash-table ('base_image (not #f)) _ ...))
+     (add1 (vector-index-right (cut string=? "volume" <>) order)))
+
+    ((list name _ _ _)
+     ((if (cadddr c) + -)
+      (add1 (or (vector-index (cut string=? (car c) <>) order) 999))))))
 
 
 (define communicator%

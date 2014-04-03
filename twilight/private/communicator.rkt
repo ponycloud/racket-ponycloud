@@ -195,7 +195,7 @@
 
     ;; Augment desired state with partial changes.
     (define/private (receive-changes changes)
-      (for ((change (sort changes < score-change)))
+      (for ((change (sort changes < #:key score-change)))
         (let-values (((entity id part new-data) (apply values change)))
           (let* ((key     (list entity id))
                  (current (hash-ref remote-state key #f)))

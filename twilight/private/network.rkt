@@ -280,7 +280,7 @@
         (send master remove-role this))
 
       ;; Notify user about the changes.
-      ((current-notify) "nic_role" uuid #f))
+      ((current-notify) "net_role" uuid #f))
 
 
     (define/public (copy-interfaces role)
@@ -374,7 +374,7 @@
 
     (define/public (notify)
       ;; Notify about our current state.
-      ((current-notify) "nic_role" uuid
+      ((current-notify) "net_role" uuid
         (hasheq 'uuid uuid
                 'name name
                 'vlan_id (or vlan-id 'null)

@@ -59,7 +59,7 @@
         (match entity
           ("nic"          (send network-manager setup-nic id value))
           ("bond"         (send network-manager setup-bond id value))
-          ("nic_role"     (send network-manager setup-role id value))
+          ("net_role"     (send network-manager setup-role id value))
           ("storage_pool" (send storage-manager pool-configure value))
           ("disk"         (send storage-manager disk-configure value))
           (else
@@ -71,7 +71,7 @@
         (match entity
           ("nic"          (send network-manager remove-nic id value))
           ("bond"         (send network-manager remove-bond id value))
-          ("nic_role"     (send network-manager remove-role id value))
+          ("net_role"     (send network-manager remove-role id value))
           ("storage_pool" (send storage-manager pool-deconfigure value))
           ("disk"         (send storage-manager disk-deconfigure value))
           (else

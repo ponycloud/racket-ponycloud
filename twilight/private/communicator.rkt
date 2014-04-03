@@ -37,7 +37,7 @@
 ;; this is a simple dependency management using type for ordering.
 (define (score-change c)
   (define order
-    #("nic" "bond" "nic_role" "disk" "storage_pool" "image" "extent"
+    #("nic" "bond" "net_role" "disk" "storage_pool" "image" "extent"
       "volume" "volume"))
 
   (match c

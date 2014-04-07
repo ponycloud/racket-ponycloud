@@ -62,6 +62,9 @@
           ("net_role"     (send network-manager setup-role id value))
           ("storage_pool" (send storage-manager pool-configure value))
           ("disk"         (send storage-manager disk-configure value))
+          ("image"        (send storage-manager image-configure value))
+          ("extent"       (send storage-manager extent-configure value))
+          ("volume"       (send storage-manager volume-configure value))
           (else
             (printf "setup-entity ~s not implemented\n" entity)))))
 
@@ -74,6 +77,9 @@
           ("net_role"     (send network-manager remove-role id value))
           ("storage_pool" (send storage-manager pool-deconfigure value))
           ("disk"         (send storage-manager disk-deconfigure value))
+          ("image"        (send storage-manager image-deconfigure value))
+          ("extent"       (send storage-manager extent-deconfigure value))
+          ("volume"       (send storage-manager volume-deconfigure value))
           (else
             (printf "remove-entity ~s not implemented\n" entity)))))
 

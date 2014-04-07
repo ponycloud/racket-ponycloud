@@ -264,11 +264,11 @@
                "current"
                (modify 'id 'disk)))
 
-        ("storage_pool"
-         (list "host_storage_pool"
+        ((or "storage_pool" "extent" "image" "volume")
+         (list (string-append "host_" entity)
                (make-id 'host 'uuid)
                "current"
-               (modify 'uuid 'storage_pool)))
+               (modify 'uuid (string->symbol entity))))
 
         (else
          (list entity id "current" data))))

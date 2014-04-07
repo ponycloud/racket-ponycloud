@@ -157,6 +157,120 @@
     (super-new)))
 
 
+(define/contract image%
+                 entity/c
+  (class entity%
+    ;; Inherit the generic fields.
+    (inherit-field pkey)
+
+    ;; Volumes backing the image.
+    (field (volumes (set)))
+
+    ;; If defined, the remote address of the image.
+    (field (source-uri #f))
+
+
+    ;; Setup the image entity using the information from controller.
+    (define/augment (configure info)
+      (let-from-dict ((source_uri) info)
+        (set! source-uri source_uri)))
+
+
+    ;; Allow receival of volume events to be able to add backing volumes.
+    (define/override (interested? other)
+      (is-a? other volume%))
+
+
+    ;; React to volume changes by collecting the ones that are backing us.
+    (define/override (other-changed volume)
+      (when (equal? (get-field image volume) pkey)
+        (set! volumes (set-add volumes volume))))
+
+
+    ;; React to volume removal by removing them from the set of the ones
+    ;; that are backing the image.
+    (define/override (other-removed volume)
+      (set! volumes (set-remove volumes volume)))
+
+
+    ;; Return unique entity key.
+    (define/override (get-key)
+      (list "image" pkey))
+
+
+    ;; Construct parent object.
+    (super-new)))
+
+
+(define/contract extent%
+                 entity/c
+  (class entity%
+    ;; Inherit the generic fields.
+    (inherit-field pkey)
+
+    ;; Detailed information about the extent.
+    (field (start #f)
+           (size #f)
+           (volume #f)
+           (disk #f)
+           (order #f))
+
+
+    ;; Populate the extent information from configuration hash.
+    (define/augment (configure info)
+      (let-from-dict ((range volume disk order) info)
+        (set-field! start this (first range))
+        (set-field! size this (- (second range) (first range)))
+        (set-field! volume this volume)
+        (set-field! disk this disk)
+        (set-field! order this order)))
+
+
+    ;; Reset the extent information.
+    (define/augment (deconfigure)
+      (set!-values (start size volume disk order)
+        (values #f #f #f #f #f)))
+
+
+    ;; Return unique entity key.
+    (define/override (get-key)
+      (list "extent" pkey))
+
+
+    ;; Construct parent object.
+    (super-new)))
+
+
+(define/contract volume%
+                 entity/c
+  (class entity%
+    ;; Inherit the generic fields.
+    (inherit-field pkey)
+
+    ;; The image this volume is backing, if any.
+    (field (image #f))
+
+
+    ;; Configure the volume using the dict from controller.
+    (define/augment (configure info)
+      (let-from-dict ((image) info)
+        (set-field! image this image)))
+
+
+    ;; Deconfigure the volume.
+    (define/augment (deconfigure)
+      (set! image #f))
+
+
+    ;; Return unique entity key.
+    (define/override (get-key)
+      (list "volume" pkey))
+
+
+    ;; Construct parent object.
+    (super-new)))
+
+
 (define storage-manager/c
   (and/c manager/c
          (class/c
@@ -183,19 +297,6 @@
     (define/private (disk-udev-pkey info)
       (regexp-replace #rx"^mpath-" (hash-ref info 'DM_UUID) ""))
 
-    ;; Extract disk% primary key from configuration.
-    (define/private (disk-conf-pkey info)
-      (hash-ref info 'id))
-
-
-    ;; Extract storage-pool% primary key from configuration.
-    (define/private (storage-pool-conf-pkey info)
-      (hash-ref info 'uuid))
-
-    ;; Extract storage-pool% type from configuration.
-    (define/private (storage-pool-conf-type info)
-      (hash-ref info 'type))
-
 
     ;; Find an existing or create a new disk% instance.
     (define/private (find-disk pkey)
@@ -205,10 +306,31 @@
 
     ;; Find an existing or create a new storage-pool% instance.
     (define/private (find-storage-pool info)
-      (let ((pkey (storage-pool-conf-pkey info))
-            (type (storage-pool-conf-type info)))
+      (let ((pkey (hash-ref info 'uuid))
+            (type (hash-ref info 'type)))
         (let ((key (list "storage_pool" pkey)))
           (hash-ref entities key (λ _ (make-storage-pool type pkey))))))
+
+
+    ;; Find an existing or create a new image% instance.
+    (define/private (find-image info)
+      (let* ((pkey (hash-ref info 'uuid))
+             (key  (list "disk" pkey)))
+        (hash-ref entities key (λ _ (new image% (pkey pkey))))))
+
+
+    ;; Find an existing or create a new extent% instance.
+    (define/private (find-extent info)
+      (let* ((pkey (hash-ref info 'uuid))
+             (key  (list "extent" pkey)))
+        (hash-ref entities key (λ _ (new extent% (pkey pkey))))))
+
+
+    ;; Find an existing or create a new volume% instance.
+    (define/private (find-volume info)
+      (let* ((pkey (hash-ref info 'uuid))
+             (key  (list "volume" pkey)))
+        (hash-ref entities key (λ _ (new volume% (pkey pkey))))))
 
 
     ;; Process block device create/update event from udev.
@@ -225,13 +347,13 @@
 
     ;; Configure disk% using desired state.
     (define/public (disk-configure info)
-      (using (find-disk (disk-conf-pkey info))
+      (using (find-disk (hash-ref info 'id))
         (configure <it> info)))
 
 
     ;; Deconfigure disk on withdrawal of configuration.
     (define/public (disk-deconfigure info)
-      (using (find-disk (disk-conf-pkey info))
+      (using (find-disk (hash-ref info 'id))
         (deconfigure <it>)))
 
 
@@ -244,6 +366,42 @@
     ;; Remove configuration of a storage pool.
     (define/public (pool-deconfigure info)
       (using (find-storage-pool info)
+        (deconfigure <it>)))
+
+
+    ;; Configure image using supplied information.
+    (define/public (image-configure info)
+      (using (find-image info)
+        (configure <it> info)))
+
+
+    ;; Remove configuration of an image.
+    (define/public (image-deconfigure info)
+      (using (find-image info)
+        (deconfigure <it>)))
+
+
+    ;; Configure extent using supplied information.
+    (define/public (extent-configure info)
+      (using (find-extent info)
+        (configure <it> info)))
+
+
+    ;; Remove configuration of an extent.
+    (define/public (extent-deconfigure info)
+      (using (find-extent info)
+        (deconfigure <it>)))
+
+
+    ;; Configure volume using supplied information.
+    (define/public (volume-configure info)
+      (using (find-volume info)
+        (configure <it> info)))
+
+
+    ;; Remove configuration of an volume.
+    (define/public (volume-deconfigure info)
+      (using (find-volume info)
         (deconfigure <it>)))
 
 

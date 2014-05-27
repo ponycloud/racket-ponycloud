@@ -140,7 +140,7 @@
               (hwaddr (get-device-hwaddr info)))
           (sink 'add name hwaddr)))))
 
-  (recurring-event-task (info (device-changed-evt #:subsystem "net"))
+  (recurring-event-task ((device-changed-evt #:subsystem "net") info)
     (when (info-with-hwaddr? info)
       (let ((action (string->symbol (hash-ref info 'ACTION)))
             (name   (hash-ref info 'INTERFACE))
@@ -155,7 +155,7 @@
       (when (info-mpath? info)
         (sink 'add info))))
 
-  (recurring-event-task (info (device-changed-evt #:subsystem "block"))
+  (recurring-event-task ((device-changed-evt #:subsystem "block") info)
     (when (info-mpath? info)
       (let ((action (string->symbol (hash-ref info 'ACTION))))
         (sink action info)))))

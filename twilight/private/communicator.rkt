@@ -284,7 +284,7 @@
         (keep-alive))
 
       ;; Receive messages from Sparkle.
-      (recurring-event-task (message (socket-receive-evt socket))
+      (recurring-event-task ((socket-receive-evt socket) message)
         (let-values (((sender payload time) (apply values message)))
           (receive payload time))))
 

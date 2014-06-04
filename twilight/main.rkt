@@ -15,8 +15,7 @@
          tasks
          udev)
 
-(require "private/util.rkt"
-         "private/common.rkt"
+(require "private/common.rkt"
          "private/network.rkt"
          "private/storage.rkt"
          "private/libvirt.rkt"

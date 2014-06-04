@@ -6,11 +6,13 @@
 (require racket/class
          racket/contract)
 
-(require williams/uuid1/uuid
+(require misc1/syntax
+         misc1/dict
+         misc1/list
+         williams/uuid1/uuid
          json)
 
-(require "common.rkt"
-         "util.rkt")
+(require "common.rkt")
 
 (provide entity/c
          entity%
@@ -111,7 +113,7 @@
       (dict-merge base (inner null status)))
 
     (define/public-final (notify)
-      (let-from-list ((name pkey) (get-key))
+      (let-list (((name pkey) (get-key)))
         (notify-sparkle name pkey (and (or present? configured?) (status)))))
 
     (super-new)))
@@ -172,23 +174,23 @@
 
     (define/public-final (configure entity info)
       (maybe-add
-        (producing entity
-          (send <it> configure info))))
+        (producing (it entity)
+          (send it configure info))))
 
     (define/public-final (deconfigure entity)
       (maybe-remove
-        (producing entity
-          (send <it> deconfigure))))
+        (producing (it entity)
+          (send it deconfigure))))
 
     (define/public-final (appear entity info)
       (maybe-add
-        (producing entity
-          (send <it> appear info))))
+        (producing (it entity)
+          (send it appear info))))
 
     (define/public-final (disappear entity)
       (maybe-remove
-        (producing entity
-          (send <it> disappear))))
+        (producing (it entity)
+          (send it disappear))))
 
     (super-new)))
 

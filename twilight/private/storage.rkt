@@ -12,11 +12,12 @@
          racket/set
          srfi/26)
 
-(require sysfs/block
+(require misc1/syntax
+         misc1/dict
+         sysfs/block
          tasks)
 
-(require "util.rkt"
-         "common.rkt"
+(require "common.rkt"
          "entity.rkt")
 
 (provide storage-manager%
@@ -61,12 +62,15 @@
 
     ;; Clear current state information.
     (define/augment (disappear)
-      (set!-many (blkdev-name blkdev-major blkdev-minor blkdev-size) #f))
+      (set! blkdev-name #f)
+      (set! blkdev-major #f)
+      (set! blkdev-minor #f)
+      (set! blkdev-size #f))
 
 
     ;; Apply the desired configuration.
     (define/augment (configure info)
-      (let-from-dict ((size storage_pool) info)
+      (let-dict (((size storage_pool) info))
         (set! storage-pool storage_pool)
         (set! minimal-size (* size (expt 2 20)))))
 
@@ -172,7 +176,7 @@
 
     ;; Setup the image entity using the information from controller.
     (define/augment (configure info)
-      (let-from-dict ((source_uri) info)
+      (let-dict (((source_uri) info))
         (set! source-uri source_uri)))
 
 
@@ -218,7 +222,7 @@
 
     ;; Populate the extent information from configuration hash.
     (define/augment (configure info)
-      (let-from-dict ((range volume disk order) info)
+      (let-dict (((range volume disk order) info))
         (set-field! start this (first range))
         (set-field! size this (- (second range) (first range)))
         (set-field! volume this volume)
@@ -253,7 +257,7 @@
 
     ;; Configure the volume using the dict from controller.
     (define/augment (configure info)
-      (let-from-dict ((image) info)
+      (let-dict (((image) info))
         (set-field! image this image)))
 
 
@@ -335,74 +339,74 @@
 
     ;; Process block device create/update event from udev.
     (define/public (disk-blkdev-changed info)
-      (using (find-disk (disk-udev-pkey info))
-        (appear <it> info)))
+      (using (disk (find-disk (disk-udev-pkey info)))
+        (appear disk info)))
 
 
     ;; Process block device removal event from udev.
     (define/public (disk-blkdev-removed info)
-      (using (find-disk (disk-udev-pkey info))
-        (disappear <it>)))
+      (using (disk (find-disk (disk-udev-pkey info)))
+        (disappear disk)))
 
 
     ;; Configure disk% using desired state.
     (define/public (disk-configure info)
-      (using (find-disk (hash-ref info 'id))
-        (configure <it> info)))
+      (using (disk (find-disk (hash-ref info 'id)))
+        (configure disk info)))
 
 
     ;; Deconfigure disk on withdrawal of configuration.
     (define/public (disk-deconfigure info)
-      (using (find-disk (hash-ref info 'id))
-        (deconfigure <it>)))
+      (using (disk (find-disk (hash-ref info 'id)))
+        (deconfigure disk)))
 
 
     ;; Configure storage-pool using supplied information.
     (define/public (pool-configure info)
-      (using (find-storage-pool info)
-        (configure <it> info)))
+      (using (sp (find-storage-pool info))
+        (configure sp info)))
 
 
     ;; Remove configuration of a storage pool.
     (define/public (pool-deconfigure info)
-      (using (find-storage-pool info)
-        (deconfigure <it>)))
+      (using (sp (find-storage-pool info))
+        (deconfigure sp)))
 
 
     ;; Configure image using supplied information.
     (define/public (image-configure info)
-      (using (find-image info)
-        (configure <it> info)))
+      (using (image (find-image info))
+        (configure image info)))
 
 
     ;; Remove configuration of an image.
     (define/public (image-deconfigure info)
-      (using (find-image info)
-        (deconfigure <it>)))
+      (using (image (find-image info))
+        (deconfigure image)))
 
 
     ;; Configure extent using supplied information.
     (define/public (extent-configure info)
-      (using (find-extent info)
-        (configure <it> info)))
+      (using (extent (find-extent info))
+        (configure extent info)))
 
 
     ;; Remove configuration of an extent.
     (define/public (extent-deconfigure info)
-      (using (find-extent info)
-        (deconfigure <it>)))
+      (using (extent (find-extent info))
+        (deconfigure extent)))
 
 
     ;; Configure volume using supplied information.
     (define/public (volume-configure info)
-      (using (find-volume info)
-        (configure <it> info)))
+      (using (volume (find-volume info))
+        (configure volume info)))
 
 
     ;; Remove configuration of an volume.
     (define/public (volume-deconfigure info)
-      (using (find-volume info)
-        (deconfigure <it>)))
+      (using (volume (find-volume info))
+        (deconfigure volume)))
 
 
     ;; Construct parent object.

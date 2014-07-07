@@ -61,9 +61,9 @@
     (field (connect-to (get-field connect-to twilight)))
 
     ;; Connection to the Sparkle cloud controller.
-    (field (socket (make-socket 'router
-                                #:identity (uuid->string (make-uuid-4))
-                                #:connect (list connect-to))))
+    (field (router (socket 'router
+                           #:identity (uuid->string (make-uuid-4))
+                           #:connect (list connect-to))))
 
     ;; Incarnations of the local and remote changes streams.
     ;; We start with completely bogus IDs, which will lead to an early reset.
@@ -112,7 +112,7 @@
       ((current-communicator-logger) 'out payload)
 
       ;; Send payload to sparkle with current time.
-      (socket-send socket "sparkle"
+      (socket-send router "sparkle"
                           (jsexpr->bytes payload)
                           (number->string (current-seconds))))
 
@@ -284,9 +284,8 @@
         (keep-alive))
 
       ;; Receive messages from Sparkle.
-      (recurring-event-task ((socket-receive-evt socket) message)
-        (let-values (((sender payload time) (apply values message)))
-          (receive payload time))))
+      (recurring-event-task (router message)
+        (receive (cadr message) (caddr message))))
 
 
     ;; Construct parent object.

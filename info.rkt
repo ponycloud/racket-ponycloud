@@ -1,8 +1,7 @@
 #lang setup/infotab
 
 (define collection 'multi)
-(define deps '("sysfs" "rtnl" "udev" "libvirt" "zmq" "tasks"
-               "xexpr-path" "planet-williams-uuid1" "planet-soegaard-digest1"
-               "misc1"))
+(define deps '("base" "scribble-lib" "sysfs" "rtnl" "udev" "libvirt" "zmq"
+               "tasks" "xexpr-path" "misc1" "dds" "planet-williams-uuid1"))
 
 ; vim:set ts=2 sw=2 et:

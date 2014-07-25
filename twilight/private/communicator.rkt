@@ -16,7 +16,7 @@
          json
          zmq)
 
-(require williams/uuid1/uuid)
+(require libuuid)
 
 (provide (all-defined-out))
 
@@ -62,13 +62,13 @@
 
     ;; Connection to the Sparkle cloud controller.
     (field (router (socket 'router
-                           #:identity (uuid->string (make-uuid-4))
+                           #:identity (uuid-generate)
                            #:connect (list connect-to))))
 
     ;; Incarnations of the local and remote changes streams.
     ;; We start with completely bogus IDs, which will lead to an early reset.
-    (field (local-incarnation  (uuid->string (make-uuid-4)))
-           (remote-incarnation (uuid->string (make-uuid-4))))
+    (field (local-incarnation  (uuid-generate))
+           (remote-incarnation (uuid-generate)))
 
     ;; Next change number of local and remote streams.
     ;; Starting unknown incarnation with 1 is invalid and remote

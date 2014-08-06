@@ -4,160 +4,110 @@
 ;
 
 (require racket/contract
-         racket/function
-         racket/string
          racket/class
          racket/match
          racket/list
-         unstable/socket)
+         json)
 
-(require libvirt
-         tasks
+(require misc1/evt
+         libuuid
+         libvirt
          udev)
 
-(require "private/common.rkt"
-         "private/network.rkt"
-         "private/storage.rkt"
-         "private/libvirt.rkt"
-         "private/communicator.rkt")
+(require "sparkle.rkt"
+         "network.rkt"
+         "storage.rkt"
+         "libvirt.rkt")
 
-(provide twilight%)
+(provide
+  (contract-out
+    (twilight% twilight-class/c)))
 
 
-;; Main object that takes care of platform management.
+;; Custom logger for the class below.
+(define-logger twilight)
+
+
+(define c-u-d/c
+  (symbols 'create 'update 'delete))
+
+
+(define twilight-class/c
+  (class/c
+    (init-field (connect-to string?))
+
+    (field (uuid uuid?)
+           (sparkle (is-a?/c sparkle%))
+           (blkdev-evt (evt/c symbol? device?))
+           (netdev-evt (evt/c symbol? device?))
+           (network-manager (is-a?/c network-manager%))
+           (storage-manager (is-a?/c storage-manager%))
+           (libvirt-manager (is-a?/c libvirt-manager%)))
+
+    (get-evt (->m evt?))))
+
+
 (define twilight%
   (class object%
     ;; 0MQ URL of controller to connect to.
     (init-field connect-to)
 
-    ;; Libvirt connection.
-    (field (libvirt (libvirt-unix-client)))
-
     ;; UUID of this host.
-    (field (uuid (libvirt-uuid libvirt)))
+    (field (uuid (libvirt-uuid)))
 
     ;; Component that communicates with Sparkle.
-    (field (communicator (new communicator% (twilight this))))
+    (field (sparkle (new sparkle%
+                         (uuid uuid)
+                         (connect-to connect-to))))
 
-    ;; Component that takes care of network interfaces.
-    (field (network-manager (new network-manager% (twilight this))))
+    ;; Udev device monitoring.
+    (field (blkdev-evt (device-changed-evt #:subsystems '(block)))
+           (netdev-evt (device-changed-evt #:subsystems '(net))))
 
-    ;; Component that takes care of block devices.
-    (field (storage-manager (new storage-manager% (twilight this))))
-
-
-    ;; Serves as network changes notification callback.
-    ;; Enhances the information and forwards it to the communicator.
-    (define (communicator-notify entity id value)
-      (let ((value-with-host (and value (hash-set value 'host uuid))))
-        (send communicator publish/one entity id (or value-with-host 'null))))
+    ;; High-level subsystem managers.
+    (field (network-manager (new network-manager% (twilight this)))
+           (storage-manager (new storage-manager% (twilight this)))
+           (libvirt-manager (new libvirt-manager% (twilight this))))
 
 
-    (define/public (setup-entity entity id value)
-      (parameterize ((current-notify communicator-notify))
-        (match entity
-          ("nic"          (send network-manager setup-nic id value))
-          ("bond"         (send network-manager setup-bond id value))
-          ("net_role"     (send network-manager setup-role id value))
-          ("storage_pool" (send storage-manager pool-configure value))
-          ("disk"         (send storage-manager disk-configure value))
-          ("image"        (send storage-manager image-configure value))
-          ("extent"       (send storage-manager extent-configure value))
-          ("volume"       (send storage-manager volume-configure value))
-          (else
-            (printf "setup-entity ~s not implemented\n" entity)))))
+    ;; Complex event that runs Twilight without producing any values.
+    (define/public (get-evt)
+      (define/contract (publish/one table pkey data)
+                       (-> string? jsexpr? jsexpr? void?)
+        (send sparkle publish/one table pkey data))
 
+      (define/contract (forward action table pkey data)
+                       (-> c-u-d/c string? jsexpr? jsexpr? void?)
+        (case table
+          (("nic" "bond" "net_role")
+           (dynamic-send network-manager action table pkey data))
 
-    (define/public (remove-entity entity id value)
-      (parameterize ((current-notify communicator-notify))
-        (match entity
-          ("nic"          (send network-manager remove-nic id value))
-          ("bond"         (send network-manager remove-bond id value))
-          ("net_role"     (send network-manager remove-role id value))
-          ("storage_pool" (send storage-manager pool-deconfigure value))
-          ("disk"         (send storage-manager disk-deconfigure value))
-          ("image"        (send storage-manager image-deconfigure value))
-          ("extent"       (send storage-manager extent-deconfigure value))
-          ("volume"       (send storage-manager volume-deconfigure value))
-          (else
-            (printf "remove-entity ~s not implemented\n" entity)))))
+          (("disk" "volume" "extent" "storage_pool")
+           (dynamic-send storage-manager action table pkey data))
 
+          (("instance" "vdisk" "vnic")
+           (dynamic-send libvirt-manager action table pkey data))))
 
-    (begin
-      (monitor-network-devices
-        (λ (action name hwaddr)
-          (parameterize ((current-notify communicator-notify))
-            (match action
-              ('remove
-               (send network-manager unassign-nic-device hwaddr name))
+      (recurring-evt
+        (choice-evt (wrap-evt (send sparkle get-evt) forward)
 
-              (else
-               (send network-manager assign-nic-device hwaddr name))))))
+                    (wrap-evt (send network-manager get-evt) publish/one)
+                    (wrap-evt (send storage-manager get-evt) publish/one)
+                    (wrap-evt (send libvirt-manager get-evt) publish/one)
 
-      (monitor-storage-devices
-        (λ (action info)
-          (parameterize ((current-notify communicator-notify))
-            (match action
-              ('remove
-               (send storage-manager disk-blkdev-removed info))
+                    (wrap-evt blkdev-evt
+                              (λ (action device)
+                                (send storage-manager
+                                      on-device-event action device)))
 
-              (else
-               (send storage-manager disk-blkdev-changed info)))))))
+                    (wrap-evt netdev-evt
+                              (λ (action device)
+                                (send network-manager
+                                      on-device-event action device))))))
 
 
     ;; Construct parent object.
     (super-new)))
-
-
-(define (info-with-hwaddr? info)
-  (and (hash? info)
-       (hash-has-key? info 'ID_NET_NAME_MAC)))
-
-
-(define (info-mpath? info)
-  (and (hash? info)
-       (regexp-match? #rx"^mpath-" (hash-ref info 'DM_UUID ""))))
-
-
-(define (hwaddr? addr)
-  (and (string? addr)
-       (regexp-match? #rx"^[a-f0-9][a-f0-9](:[a-f0-9][a-f0-9])*$" addr)))
-
-
-(define/contract (get-device-hwaddr info)
-                 (-> info-with-hwaddr? hwaddr?)
-  (let ((id (hash-ref info 'ID_NET_NAME_MAC)))
-    (string-join (regexp-match* ".." (substring id 3)) ":")))
-
-
-(define/contract (monitor-network-devices sink)
-                 (-> (-> symbol? string? hwaddr? void?) void?)
-  (task
-    (for (((syspath info) (list-devices #:subsystem "net")))
-      (when (info-with-hwaddr? info)
-        (let ((name   (hash-ref info 'INTERFACE))
-              (hwaddr (get-device-hwaddr info)))
-          (sink 'add name hwaddr)))))
-
-  (recurring-event-task ((device-changed-evt #:subsystem "net") info)
-    (when (info-with-hwaddr? info)
-      (let ((action (string->symbol (hash-ref info 'ACTION)))
-            (name   (hash-ref info 'INTERFACE))
-            (hwaddr (get-device-hwaddr info)))
-        (sink action name hwaddr)))))
-
-
-(define/contract (monitor-storage-devices sink)
-                 (-> (-> symbol? hash? void?) void?)
-  (task
-    (for (((syspath info) (list-devices #:subsystem "block")))
-      (when (info-mpath? info)
-        (sink 'add info))))
-
-  (recurring-event-task ((device-changed-evt #:subsystem "block") info)
-    (when (info-mpath? info)
-      (let ((action (string->symbol (hash-ref info 'ACTION))))
-        (sink action info)))))
 
 
 ; vim:set ts=2 sw=2 et:

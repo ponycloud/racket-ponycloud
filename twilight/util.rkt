@@ -4,18 +4,17 @@
 ;
 
 (require racket/contract
-         racket/function
          racket/generator
-         racket/string
-         racket/format
-         racket/dict)
+         racket/format)
 
-(require (for-syntax racket/base))
+(provide
+  (contract-out
+    (hwaddr? predicate/c)
+    (generate-hwaddr (-> hwaddr?))
 
-(provide allocate-bond-name
-         allocate-bridge-name
-         allocate-vxlan-name
-         generate-hwaddr)
+    (allocate-bond-name (-> string?))
+    (allocate-bridge-name (-> string?))
+    (allocate-vxlan-name (-> string?))))
 
 
 (define (make-allocator prefix num-bytes)
@@ -38,6 +37,10 @@
 
 (define (generate-hwaddr)
   (foldl append-octet-string "42" (random-octets 5)))
+
+(define (hwaddr? v)
+  (and (string? v)
+       (regexp-match? #px"^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2})*$" v)))
 
 
 ; vim:set ts=2 sw=2 et:

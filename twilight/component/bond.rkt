@@ -30,10 +30,10 @@
   (symbols 'active-backup '802.3ad))
 
 (define lacp-rate/c
-  (symbols 'fast 'slow))
+  (or/c #f 'fast 'slow))
 
 (define xmit-hash-policy/c
-  (symbols 'layer2 'layer2+3 'layer3+4))
+  (or/c #f 'layer2 'layer2+3 'layer3+4))
 
 
 (struct bond

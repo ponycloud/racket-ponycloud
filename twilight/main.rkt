@@ -12,7 +12,8 @@
 (require misc1/evt
          libuuid
          libvirt
-         udev)
+         udev
+         dds)
 
 (require "sparkle.rkt"
          "network.rkt"
@@ -60,6 +61,9 @@
                          (uuid uuid)
                          (connect-to connect-to))))
 
+    ;; Intra-component dependency solver and scheduler.
+    (field (solver (make-solver)))
+
     ;; Udev device monitoring.
     (field (blkdev-evt (device-changed-evt #:subsystems '(block)))
            (netdev-evt (device-changed-evt #:subsystems '(net))))
@@ -94,6 +98,15 @@
                     (wrap-evt (send network-manager get-evt) publish/one)
                     (wrap-evt (send storage-manager get-evt) publish/one)
                     (wrap-evt (send libvirt-manager get-evt) publish/one)
+
+                    (wrap-evt solver
+                              (λ (action target result)
+                                (send network-manager
+                                      on-solver-event action target result)
+                                (send storage-manager
+                                      on-solver-event action target result)
+                                (send libvirt-manager
+                                      on-solver-event action target result)))
 
                     (wrap-evt blkdev-evt
                               (λ (action device)

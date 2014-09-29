@@ -7,7 +7,8 @@
          racket/class
          json)
 
-(require libuuid)
+(require libuuid
+         dds)
 
 (provide
   (contract-out
@@ -26,7 +27,11 @@
 
     (create create-update-delete/c)
     (update create-update-delete/c)
-    (delete create-update-delete/c)))
+    (delete create-update-delete/c)
+
+    (on-solver-event (->m symbol? target? any/c void?))
+
+    (get-evt (->m (evt/c string? jsexpr? jsexpr?)))))
 
 
 (define libvirt-manager%
@@ -40,6 +45,9 @@
       (void))
 
     (define/public (delete table pkey data)
+      (void))
+
+    (define/public (on-solver-event action target result)
       (void))
 
     (define/public (get-evt)

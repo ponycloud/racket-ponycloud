@@ -7,7 +7,9 @@
          racket/class
          json)
 
-(require libuuid)
+(require libuuid
+         udev
+         dds)
 
 (require "util.rkt"
          "component/nic.rkt"
@@ -33,7 +35,12 @@
 
     (create create-update-delete/c)
     (update create-update-delete/c)
-    (delete create-update-delete/c)))
+    (delete create-update-delete/c)
+
+    (on-device-event (->m symbol? device? void?))
+    (on-solver-event (->m symbol? target? any/c void?))
+
+    (get-evt (->m (evt/c string? jsexpr? jsexpr?)))))
 
 
 (define network-manager%
@@ -47,6 +54,12 @@
       (void))
 
     (define/public (delete table pkey data)
+      (void))
+
+    (define/public (on-device-event action device)
+      (void))
+
+    (define/public (on-solver-event action target result)
       (void))
 
     (define/public (get-evt)

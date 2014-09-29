@@ -7,7 +7,9 @@
          racket/class
          json)
 
-(require libuuid)
+(require libuuid
+         udev
+         dds)
 
 (provide
   (contract-out
@@ -26,7 +28,12 @@
 
     (create create-update-delete/c)
     (update create-update-delete/c)
-    (delete create-update-delete/c)))
+    (delete create-update-delete/c)
+
+    (on-device-event (->m symbol? device? any/c))
+    (on-solver-event (->m symbol? target? any/c void?))
+
+    (get-evt (->m (evt/c string? jsexpr? jsexpr?)))))
 
 
 (define storage-manager%
@@ -40,6 +47,12 @@
       (void))
 
     (define/public (delete table pkey data)
+      (void))
+
+    (define/public (on-device-event action device)
+      (void))
+
+    (define/public (on-solver-event action target result)
       (void))
 
     (define/public (get-evt)

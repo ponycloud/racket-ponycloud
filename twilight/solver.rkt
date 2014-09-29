@@ -49,16 +49,19 @@
     (rc-target real-target 0))
 
   (match-let (((rc-solver real-solver targets) solver))
-    (let ((target (hash-ref! targets real-target make-rc-target)))
-      (when (incref! target)
+    (let* ((r-t-id (target-id real-target))
+           (rc-t (hash-ref! targets r-t-id make-rc-target)))
+      (unless (equal? real-target (rc-target-real rc-t))
+        (error 'rc-solver-create! "different targets with matching ids"))
+      (when (incref! rc-t)
         (solver-create! real-solver real-target)))))
 
 
-(define (rc-solver-destroy! solver real-target)
+(define (rc-solver-destroy! solver r-t-id)
   (match-let (((rc-solver real-solver targets) solver))
-    (when* ((target (hash-ref targets real-target #f)))
-      (when (decref! target)
-        (solver-destroy! real-solver real-target)))))
+    (when* ((rc-t (hash-ref targets r-t-id #f)))
+      (when (decref! rc-t)
+        (solver-destroy! real-solver (rc-target-real rc-t))))))
 
 
 ; vim:set ts=2 sw=2 et:

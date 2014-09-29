@@ -122,6 +122,14 @@
     (define/public (run)
       (sync (get-evt)))
 
+    ;; Read the initial device events.
+    (begin
+      (for ((sys-path (list-devices #:subsystems '(net))))
+        (send network-manager on-device-event 'add (device sys-path)))
+
+      (for ((sys-path (list-devices #:subsystems '(block))))
+        (send storage-manager on-device-event 'add (device sys-path))))
+
     ;; Construct parent object.
     (super-new)))
 

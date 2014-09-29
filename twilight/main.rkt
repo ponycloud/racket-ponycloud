@@ -105,6 +105,9 @@
                                 (send network-manager
                                       on-device-event action device))))))
 
+    ;; Shortcut for waiting on the event above.
+    (define/public (run)
+      (sync (get-evt)))
 
     ;; Construct parent object.
     (super-new)))

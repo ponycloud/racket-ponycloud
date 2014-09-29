@@ -13,11 +13,12 @@
   (contract-out
     (storage-manager% storage-manager/c)))
 
+
+(define storage-table/c
+  (or/c "disk" "volume" "extent" "storage_pool"))
+
 (define create-update-delete/c
-  (case->m (-> "disk" string? jsexpr? void?)
-           (-> "volume" uuid? jsexpr? void?)
-           (-> "extent" uuid? jsexpr? void?)
-           (-> "storage_pool" uuid? jsexpr? void?)))
+  (->m storage-table/c string? jsexpr? void?))
 
 (define storage-manager/c
   (class/c

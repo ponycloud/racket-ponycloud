@@ -14,10 +14,11 @@
     (libvirt-manager% libvirt-manager/c)))
 
 
+(define libvirt-table/c
+  (or/c "instance" "vdisk" "vnic"))
+
 (define create-update-delete/c
-  (case->m (-> "instance" uuid? jsexpr? void?)
-           (-> "vdisk" uuid? jsexpr? void?)
-           (-> "vnic" uuid? jsexpr? void?)))
+  (->m libvirt-table/c string? jsexpr? void?))
 
 (define libvirt-manager/c
   (class/c

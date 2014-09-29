@@ -21,10 +21,11 @@
     (network-manager% network-manager/c)))
 
 
+(define network-table/c
+  (or/c "nic" "bond" "net_role"))
+
 (define create-update-delete/c
-  (case->m (-> "nic" hwaddr? jsexpr? void?)
-           (-> "bond" uuid? jsexpr? void?)
-           (-> "net_role" uuid? jsexpr? void?)))
+  (->m network-table/c string? jsexpr? void?))
 
 (define network-manager/c
   (class/c

@@ -13,6 +13,7 @@
     (generate-hwaddr (-> hwaddr?))
 
     (allocate-bond-name (-> string?))
+    (allocate-vlan-name (-> string?))
     (allocate-bridge-name (-> string?))
     (allocate-vxlan-name (-> string?))))
 
@@ -24,6 +25,7 @@
         (yield value)))))
 
 (define allocate-bond-name   (make-allocator "bond" 5))
+(define allocate-vlan-name   (make-allocator "vlan" 5))
 (define allocate-bridge-name (make-allocator "br" 7))
 (define allocate-vxlan-name  (make-allocator "vx" 7))
 

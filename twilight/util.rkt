@@ -24,8 +24,8 @@
       (let ((value (format "~a.~a" prefix (number->string i 16))))
         (yield value)))))
 
-(define allocate-bond-name   (make-allocator "bond" 5))
-(define allocate-vlan-name   (make-allocator "vlan" 5))
+(define allocate-bond-name   (make-allocator "bn" 7))
+(define allocate-vlan-name   (make-allocator "vl" 7))
 (define allocate-bridge-name (make-allocator "br" 7))
 (define allocate-vxlan-name  (make-allocator "vx" 7))
 

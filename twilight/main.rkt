@@ -18,7 +18,8 @@
 (require "sparkle.rkt"
          "network.rkt"
          "storage.rkt"
-         "libvirt.rkt")
+         "libvirt.rkt"
+         "change.rkt")
 
 (provide
   (contract-out
@@ -27,10 +28,6 @@
 
 ;; Custom logger for the class below.
 (define-logger twilight)
-
-
-(define c-u-d/c
-  (symbols 'create 'update 'delete))
 
 
 (define twilight-class/c
@@ -80,17 +77,22 @@
                        (-> string? jsexpr? jsexpr? void?)
         (send sparkle publish/one table pkey data))
 
-      (define/contract (forward action table pkey data)
-                       (-> c-u-d/c string? jsexpr? jsexpr? void?)
-        (case table
-          (("nic" "bond" "net_role")
-           (dynamic-send network-manager action table pkey data))
+      (define/contract (forward changes)
+                       (-> (listof (or/c create? update? delete?)) void?)
+        (for ((a-change changes))
+          (case (change-table a-change)
+            (("nic" "bond" "vlan" "net_role")
+             (send network-manager apply-change a-change))
 
-          (("disk" "volume" "extent" "storage_pool")
-           (dynamic-send storage-manager action table pkey data))
+            (("disk" "volume" "extent" "storage_pool")
+             (send storage-manager apply-change a-change))
 
-          (("instance" "vdisk" "vnic")
-           (dynamic-send libvirt-manager action table pkey data))))
+            (("instance" "vdisk" "vnic")
+             (send libvirt-manager apply-change a-change))))
+
+        (send network-manager cork)
+        (send storage-manager cork)
+        (send libvirt-manager cork))
 
       (recurring-evt
         (choice-evt (wrap-evt (send sparkle get-evt) forward)
@@ -99,24 +101,23 @@
                     (wrap-evt (send storage-manager get-evt) publish/one)
                     (wrap-evt (send libvirt-manager get-evt) publish/one)
 
-                    (wrap-evt solver
-                              (λ (action target result)
-                                (send network-manager
-                                      on-solver-event action target result)
-                                (send storage-manager
-                                      on-solver-event action target result)
-                                (send libvirt-manager
-                                      on-solver-event action target result)))
-
                     (wrap-evt blkdev-evt
                               (λ (action device)
-                                (send storage-manager
-                                      on-device-event action device)))
+                                (case action
+                                  ((add change)
+                                   (send storage-manager appear device))
+
+                                  ((remove)
+                                   (send storage-manager disappear device)))))
 
                     (wrap-evt netdev-evt
                               (λ (action device)
-                                (send network-manager
-                                      on-device-event action device))))))
+                                (case action
+                                  ((add change)
+                                   (send network-manager appear device))
+
+                                  ((remove)
+                                   (send network-manager disappear device))))))))
 
     ;; Shortcut for waiting on the event above.
     (define/public (run)
@@ -125,10 +126,10 @@
     ;; Read the initial device events.
     (begin
       (for ((sys-path (list-devices #:subsystems '(net))))
-        (send network-manager on-device-event 'add (device sys-path)))
+        (send network-manager appear (device sys-path)))
 
       (for ((sys-path (list-devices #:subsystems '(block))))
-        (send storage-manager on-device-event 'add (device sys-path))))
+        (send storage-manager appear (device sys-path))))
 
     ;; Construct parent object.
     (super-new)))

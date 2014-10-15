@@ -8,6 +8,7 @@
          json)
 
 (require libuuid
+         udev
          dds)
 
 (provide
@@ -29,7 +30,8 @@
     (update create-update-delete/c)
     (delete create-update-delete/c)
 
-    (on-solver-event (->m symbol? target? any/c void?))
+    (appear (->m device? void?))
+    (disappear (->m device? void?))
 
     (get-evt (->m (evt/c string? jsexpr? jsexpr?)))))
 
@@ -47,7 +49,10 @@
     (define/public (delete table pkey data)
       (void))
 
-    (define/public (on-solver-event action target result)
+    (define/public (appear device)
+      (void))
+
+    (define/public (disappear device)
       (void))
 
     (define/public (get-evt)

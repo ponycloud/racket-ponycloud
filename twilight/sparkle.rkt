@@ -4,6 +4,8 @@
 ;
 
 (require racket/contract
+         racket/generator
+         racket/sequence
          racket/pretty
          racket/string
          racket/match
@@ -16,6 +18,8 @@
          misc1/evt
          libuuid
          zmq)
+
+(require "change.rkt")
 
 (provide
   (contract-out
@@ -47,8 +51,7 @@
                 (connect-to string?))
     (publish/one (->m string? jsexpr? jsexpr? void?))
     (publish (->m (listof (list/c string? jsexpr? "desired" jsexpr?)) void?))
-    (get-evt (->m (evt/c (symbols 'create 'update 'delete)
-                         string? jsexpr? jsexpr?)))))
+    (get-evt (->m (evt/c (listof (or/c create? update? delete?)))))))
 
 
 (define sparkle%
@@ -160,40 +163,41 @@
 
 
     (define/private (receive/full changes)
-      ;; The changes represent complete remote state.
-      ;; Receive it as a normal incremental update...
-      (receive changes)
+      ;; In order to match the full configuration we have just received,
+      ;; any rows that are not part of it need to be deleted.
+      (define deletes
+        (let ((old-keys (list->set (hash-keys remote-state)))
+              (new-keys (for/set ((change changes))
+                          (take change 2))))
+          (for/list ((key (set-subtract old-keys new-keys)))
+            (append key '("desired" #f)))))
 
-      ;; ... but also generate fake remove changes for
-      ;; rows that should be no longer present.
-      (let ((old-keys (list->set
-                        (hash-keys remote-state)))
-            (new-keys (for/set ((change changes))
-                        (take change 2))))
-        (for/list ((key (set-subtract old-keys new-keys)))
-          (receive/one (first key) (second key) #f))))
+      ;; Receive both lists in a single transaction.
+      (receive (append changes deletes)))
 
 
     (define/private (receive changes)
-      (for ((change changes))
-        (match-let (((list table pkey "desired" data) change))
-          (receive/one table pkey data))))
+      (define struct-changes
+        (in-generator
+          (for ((change changes))
+            (match-let (((list table pkey "desired" data) change))
+              (let* ((key (list table pkey))
+                     (old (hash-ref remote-state key #f)))
+                (cond
+                  ((and data old)
+                   (hash-set! remote-state key data)
+                   (yield (update table pkey data)))
 
+                  (data
+                   (hash-set! remote-state key data)
+                   (yield (create table pkey data)))
 
-    (define/private (receive/one table pkey data)
-      (let* ((key (list table pkey))
-             (old (hash-ref remote-state key #f)))
-        (unless (equal? old data)
-          (if data
-              (begin
-                (hash-set! remote-state key data)
-                (if old
-                    (fast-channel-put changes-channel 'update table pkey data)
-                    (fast-channel-put changes-channel 'create table pkey data)))
-              (begin
-                (hash-remove! remote-state key)
-                (when old
-                  (fast-channel-put changes-channel 'delete table pkey old)))))))
+                  (old
+                   (hash-remove! remote-state key)
+                   (yield (delete table pkey old)))))))))
+
+      (let ((transaction (sequence->list struct-changes)))
+        (fast-channel-put changes-channel transaction)))
 
 
     (define/public (publish/one table pkey value)

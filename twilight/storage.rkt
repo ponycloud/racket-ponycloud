@@ -30,8 +30,8 @@
     (update create-update-delete/c)
     (delete create-update-delete/c)
 
-    (on-device-event (->m symbol? device? any/c))
-    (on-solver-event (->m symbol? target? any/c void?))
+    (appear (->m device? void?))
+    (disappear (->m device? void?))
 
     (get-evt (->m (evt/c string? jsexpr? jsexpr?)))))
 
@@ -49,10 +49,10 @@
     (define/public (delete table pkey data)
       (void))
 
-    (define/public (on-device-event action device)
+    (define/public (appear device)
       (void))
 
-    (define/public (on-solver-event action target result)
+    (define/public (disappear device)
       (void))
 
     (define/public (get-evt)

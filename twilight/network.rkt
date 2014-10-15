@@ -4,14 +4,19 @@
 ;
 
 (require racket/contract
+         racket/string
          racket/class
+         racket/match
+         racket/list
          json)
 
-(require libuuid
+(require misc1/fast-channel
+         libuuid
          udev
          dds)
 
 (require "util.rkt"
+         "change.rkt"
          "component/nic.rkt"
          "component/bond.rkt"
          "component/bridge.rkt"
@@ -23,49 +28,41 @@
     (network-manager% network-manager/c)))
 
 
-(define network-table/c
-  (or/c "nic" "bond" "net_role"))
-
-(define create-update-delete/c
-  (->m network-table/c string? jsexpr? void?))
-
 (define network-manager/c
   (class/c
     (init-field (twilight (object/c)))
 
-    (create create-update-delete/c)
-    (update create-update-delete/c)
-    (delete create-update-delete/c)
+    (apply-change (->m change? void?))
+    (cork (->m void?))
 
-    (on-device-event (->m symbol? device? void?))
-    (on-solver-event (->m symbol? target? any/c void?))
+    (appear (->m device? void?))
+    (disappear (->m device? void?))
 
-    (get-evt (->m (evt/c string? jsexpr? jsexpr?)))))
+    (get-evt (->m (evt/c change?)))))
 
 
 (define network-manager%
   (class object%
     (init-field twilight)
 
-    (define/public (create table pkey data)
+    (define events
+      (make-fast-channel))
+
+    (define/public (apply-change a-change)
       (void))
 
-    (define/public (update table pkey data)
+    (define/public (cork)
       (void))
 
-    (define/public (delete table pkey data)
+    (define/public (appear device)
       (void))
 
-    (define/public (on-device-event action device)
-      (void))
-
-    (define/public (on-solver-event action target result)
+    (define/public (disappear device)
       (void))
 
     (define/public (get-evt)
-      never-evt)
+      (values events))
 
-    ;; Construct parent object.
     (super-new)))
 
 

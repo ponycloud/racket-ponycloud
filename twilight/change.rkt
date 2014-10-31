@@ -7,27 +7,20 @@
 
 (require json)
 
-(provide struct:change
-         struct:create
-         struct:update
-         struct:delete)
-
 (provide
   (contract-out
-    (change? predicate/c)
-
-    (change-table (-> change? string?))
-    (change-key (-> change? pkey/c))
-    (change-data (-> change? data/c))
-
-    (create? predicate/c)
-    (create (-> string? pkey/c data/c create?))
-
-    (update? predicate/c)
-    (update (-> string? pkey/c data/c update?))
-
-    (delete? predicate/c)
-    (delete (-> string? pkey/c data/c delete?))))
+    (struct change ((table string?)
+                    (pkey pkey/c)
+                    (data data/c)))
+    (struct create ((table string?)
+                    (pkey pkey/c)
+                    (data data/c)))
+    (struct update ((table string?)
+                    (pkey pkey/c)
+                    (data data/c)))
+    (struct delete ((table string?)
+                    (pkey pkey/c)
+                    (data data/c)))))
 
 
 (define pkey/c
@@ -38,7 +31,7 @@
 
 
 (struct change
-  (table key data)
+  (table pkey data)
   #:transparent)
 
 (struct create change () #:transparent)

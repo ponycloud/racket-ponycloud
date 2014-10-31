@@ -49,8 +49,8 @@
   (class/c
     (init-field (uuid uuid?)
                 (connect-to string?))
-    (publish/one (->m string? jsexpr? jsexpr? void?))
-    (publish (->m (listof (list/c string? jsexpr? "desired" jsexpr?)) void?))
+    (publish/one (->m change? void?))
+    (publish (->m (listof change?) void?))
     (get-evt (->m (evt/c (listof (or/c create? update? delete?)))))))
 
 
@@ -200,23 +200,34 @@
         (fast-channel-put changes-channel transaction)))
 
 
-    (define/public (publish/one table pkey value)
-      (publish (list (list table pkey "current" value))))
+    (define/public (publish/one a-change)
+      (publish (list a-change)))
 
 
     (define/public (publish changes)
-      (for/list ((change changes))
-        (match-let (((list table pkey "current" data) change))
-          (let ((key (list table pkey)))
-            (if data
-                (hash-set! local-state key data)
-                (hash-remove! local-state key)))))
+      (define list-changes
+        (for/list ((a-change changes))
+          (match a-change
+            ((create table pkey data)
+             (let ((key (list table pkey)))
+               (hash-set! local-state key data))
+             (list table pkey "current" data))
+
+            ((update table pkey data)
+             (let ((key (list table pkey)))
+               (hash-set! local-state key data))
+             (list table pkey "current" data))
+
+            ((delete table pkey _)
+             (let ((key (list table pkey)))
+               (hash-remove! local-state key)
+               (list table pkey "current" 'null))))))
 
       ;; Delay sending incremental changes until after we have
       ;; synchronized communication with peer. Prevents lots of
       ;; unnecessary resyncs on startup.
       (when synchronized?
-        (send-changes changes)))
+        (send-changes list-changes)))
 
 
     ;; Create a complex event that is responsible for the communication.

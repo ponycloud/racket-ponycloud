@@ -3,7 +3,8 @@
 ; Unit-Based Work Framework
 ;
 
-(require racket/contract)
+(require racket/contract
+         racket/match)
 
 (require misc1/syntax
          misc1/locking)
@@ -16,7 +17,8 @@
     (unit? predicate/c)
     (make-unit (-> (-> any/c) unit?))
     (call-with-unit-result (-> unit? (-> any/c any) any))
-    (unit-close! (-> unit? void?))))
+    (start-unit (-> unit? void?))
+    (cancel-unit (-> unit? void?))))
 
 
 (struct unit
@@ -41,9 +43,12 @@
   (let* ((wlock (make-semaphore 0))
          (rwlock (make-rwlock wlock)))
     (let ((result void))
-      (let ((thread (spawn-thread
-                      (set! result (call/wrap long-running-proc))
-                      (semaphore-post wlock))))
+      (let ((thread (parameterize-break #f
+                      (spawn-thread
+                        (parameterize-break #t
+                          (thread-receive))
+                        (set! result (call/wrap long-running-proc))
+                        (semaphore-post wlock)))))
         (let ((event (wrap-evt thread
                                (λ (thread)
                                  (result)))))
@@ -53,9 +58,14 @@
   (with-read-lock (unit-rwlock unit)
     (proc (sync unit))))
 
-(define (unit-close! unit)
-  (semaphore-wait
-    (unit-rwlock unit)))
+(define (start-unit an-unit)
+  (let ((thread (unit-thread an-unit)))
+    (thread-send thread 'start)))
+
+(define (cancel-unit an-unit)
+  (match-let (((unit thread _ wlock _) an-unit))
+    (break-thread thread)
+    (semaphore-wait wlock)))
 
 (define-syntax with-unit-result
   (syntax-rules ()

@@ -51,7 +51,7 @@
                 (connect-to string?))
     (publish/one (->m change? void?))
     (publish (->m (listof change?) void?))
-    (get-evt (->m (evt/c (listof (or/c create? update? delete?)))))))
+    (get-evt (->m (evt/c (listof change?))))))
 
 
 (define sparkle%
@@ -186,15 +186,15 @@
                 (cond
                   ((and data old)
                    (hash-set! remote-state key data)
-                   (yield (update table pkey data)))
+                   (yield (change table pkey data)))
 
                   (data
                    (hash-set! remote-state key data)
-                   (yield (create table pkey data)))
+                   (yield (change table pkey data)))
 
                   (old
                    (hash-remove! remote-state key)
-                   (yield (delete table pkey old)))))))))
+                   (yield (change table pkey #f)))))))))
 
       (let ((transaction (sequence->list struct-changes)))
         (fast-channel-put changes-channel transaction)))
@@ -208,20 +208,15 @@
       (define list-changes
         (for/list ((a-change changes))
           (match a-change
-            ((create table pkey data)
+            ((change table pkey #f)
+             (let ((key (list table pkey)))
+               (hash-remove! local-state key))
+             (list table pkey "current" #f))
+
+            ((change table pkey data)
              (let ((key (list table pkey)))
                (hash-set! local-state key data))
-             (list table pkey "current" data))
-
-            ((update table pkey data)
-             (let ((key (list table pkey)))
-               (hash-set! local-state key data))
-             (list table pkey "current" data))
-
-            ((delete table pkey _)
-             (let ((key (list table pkey)))
-               (hash-remove! local-state key)
-               (list table pkey "current" 'null))))))
+             (list table pkey "current" data)))))
 
       ;; Delay sending incremental changes until after we have
       ;; synchronized communication with peer. Prevents lots of

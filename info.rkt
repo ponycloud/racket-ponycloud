@@ -2,6 +2,6 @@
 
 (define collection 'multi)
 (define deps '("base" "scribble-lib" "kernel" "udev" "libvirt" "zmq"
-               "xexpr-path" "misc1" "dds" "libuuid"))
+               "xexpr-path" "misc1" "libuuid"))
 
 ; vim:set ts=2 sw=2 et:

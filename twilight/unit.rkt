@@ -17,8 +17,8 @@
     (unit? predicate/c)
     (make-unit (-> (-> any/c) unit?))
     (call-with-unit-result (-> unit? (-> any/c any) any))
-    (start-unit (-> unit? void?))
-    (cancel-unit (-> unit? void?))))
+    (unit-start! (-> unit? void?))
+    (unit-cancel! (-> unit? void?))))
 
 
 (struct unit
@@ -58,14 +58,16 @@
   (with-read-lock (unit-rwlock unit)
     (proc (sync unit))))
 
-(define (start-unit an-unit)
+
+(define (unit-start! an-unit)
   (let ((thread (unit-thread an-unit)))
     (thread-send thread 'start)))
 
-(define (cancel-unit an-unit)
+(define (unit-cancel! an-unit)
   (match-let (((unit thread _ wlock _) an-unit))
     (break-thread thread)
     (semaphore-wait wlock)))
+
 
 (define-syntax with-unit-result
   (syntax-rules ()

@@ -7,27 +7,23 @@
          racket/class
          racket/match
          racket/list
+         racket/set
          json)
 
-(require misc1/evt
-         libuuid
-         libvirt
-         udev
-         dds)
+(require misc1/syntax
+         misc1/evt)
 
-(require "sparkle.rkt"
-         "network.rkt"
-         "storage.rkt"
-         "libvirt.rkt"
-         "change.rkt")
+(require libuuid
+         libvirt
+         udev)
+
+(require twilight/sparkle
+         twilight/config
+         twilight/unit)
 
 (provide
   (contract-out
     (twilight% twilight-class/c)))
-
-
-;; Custom logger for the class below.
-(define-logger twilight)
 
 
 (define twilight-class/c
@@ -37,13 +33,16 @@
     (field (uuid uuid?)
            (sparkle (is-a?/c sparkle%))
            (blkdev-evt (evt/c symbol? device?))
-           (netdev-evt (evt/c symbol? device?))
-           (network-manager (is-a?/c network-manager%))
-           (storage-manager (is-a?/c storage-manager%))
-           (libvirt-manager (is-a?/c libvirt-manager%)))
+           (netdev-evt (evt/c symbol? device?)))
+
+    (field (configs (set/c config?))
+           (units (hash/c (list/c symbol? any/c) unit?)))
 
     (get-evt (->m evt?))))
 
+
+;; Custom logger for the class below.
+(define-logger twilight)
 
 (define twilight%
   (class object%
@@ -58,78 +57,61 @@
                          (uuid uuid)
                          (connect-to connect-to))))
 
-    ;; Intra-component dependency solver and scheduler.
-    (field (solver (make-solver)))
-
     ;; Udev device monitoring.
     (field (blkdev-evt (device-changed-evt #:subsystems '(block)))
            (netdev-evt (device-changed-evt #:subsystems '(net))))
 
-    ;; High-level subsystem managers.
-    (field (network-manager (new network-manager% (twilight this)))
-           (storage-manager (new storage-manager% (twilight this)))
-           (libvirt-manager (new libvirt-manager% (twilight this))))
-
+    ;; Hash tables with configurations and running/finished units.
+    (field (configs (set))
+           (units (make-hash)))
 
     ;; Complex event that runs Twilight without producing any values.
     (define/public (get-evt)
-      (define/contract (publish/one table pkey data)
-                       (-> string? jsexpr? jsexpr? void?)
-        (send sparkle publish/one table pkey data))
-
-      (define/contract (forward changes)
-                       (-> (listof (or/c create? update? delete?)) void?)
-        (for ((a-change changes))
-          (case (change-table a-change)
-            (("nic" "bond" "vlan" "net_role")
-             (send network-manager apply-change a-change))
-
-            (("disk" "volume" "extent" "storage_pool")
-             (send storage-manager apply-change a-change))
-
-            (("instance" "vdisk" "vnic")
-             (send libvirt-manager apply-change a-change))))
-
-        (send network-manager cork)
-        (send storage-manager cork)
-        (send libvirt-manager cork))
-
       (recurring-evt
-        (choice-evt (wrap-evt (send sparkle get-evt) forward)
+        (choice-evt
+          (wrap-evt (send sparkle get-evt)
+                    (λ (changes)
+                      (update (foldl apply-change configs changes))))
 
-                    (wrap-evt (send network-manager get-evt) publish/one)
-                    (wrap-evt (send storage-manager get-evt) publish/one)
-                    (wrap-evt (send libvirt-manager get-evt) publish/one)
+          (wrap-evt (get-units-evt)
+                    (λ (changes)
+                      (send sparkle publish changes)))
 
-                    (wrap-evt blkdev-evt
-                              (λ (action device)
-                                (case action
-                                  ((add change)
-                                   (send storage-manager appear device))
+          (wrap-evt blkdev-evt
+                    (λ (action device)
+                      (void)))
 
-                                  ((remove)
-                                   (send storage-manager disappear device)))))
+          (wrap-evt netdev-evt
+                    (λ (action device)
+                      (void))))))
 
-                    (wrap-evt netdev-evt
-                              (λ (action device)
-                                (case action
-                                  ((add change)
-                                   (send network-manager appear device))
+    (define (get-units-evt)
+      never-evt)
 
-                                  ((remove)
-                                   (send network-manager disappear device))))))))
+    (define (update new-configs)
+      (define old-configs configs)
+      (set! configs new-configs)
 
-    ;; Shortcut for waiting on the event above.
-    (define/public (run)
-      (sync (get-evt)))
+      (define new-units
+        (mutable-seteq))
+
+      (for ((a-config (set-subtract configs old-configs)))
+        (let ((unit (config-spawn-unit units a-config))
+              (key  (list (config-type a-config)
+                          (config-pkey a-config))))
+          (hash-set! units key unit)
+          (set-add!  new-units unit)))
+
+      (for ((unit new-units))
+        (unit-start! unit)))
 
     ;; Read the initial device events.
     (begin
       (for ((sys-path (list-devices #:subsystems '(net))))
-        (send network-manager appear (device sys-path)))
+        (void (device sys-path)))
 
       (for ((sys-path (list-devices #:subsystems '(block))))
-        (send storage-manager appear (device sys-path))))
+        (void (device sys-path))))
 
     ;; Construct parent object.
     (super-new)))

@@ -19,7 +19,7 @@
          libuuid
          zmq)
 
-(require "change.rkt")
+(require twilight/config)
 
 (provide
   (contract-out

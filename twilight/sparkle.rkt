@@ -237,9 +237,8 @@
 
     (begin
       ;; Automatically claim that the host exists.
-      (publish/one "host" uuid
-                   (hasheq 'uuid uuid
-                           'status "present"))
+      (publish/one (change "host" uuid (hasheq 'uuid uuid
+                                               'status "present")))
 
       ;; Ask for our configuration as soon as possible.
       (request-resync))

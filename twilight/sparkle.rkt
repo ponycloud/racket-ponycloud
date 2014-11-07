@@ -179,8 +179,8 @@
     (define/private (receive changes)
       (define struct-changes
         (in-generator
-          (for ((change changes))
-            (match-let (((list table pkey "desired" data) change))
+          (for ((a-change changes))
+            (match-let (((list table pkey "desired" data) a-change))
               (let* ((key (list table pkey))
                      (old (hash-ref remote-state key #f)))
                 (cond

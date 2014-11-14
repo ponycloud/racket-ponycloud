@@ -167,8 +167,8 @@
       ;; any rows that are not part of it need to be deleted.
       (define deletes
         (let ((old-keys (list->set (hash-keys remote-state)))
-              (new-keys (for/set ((change changes))
-                          (take change 2))))
+              (new-keys (for/set ((a-change changes))
+                          (take a-change 2))))
           (for/list ((key (set-subtract old-keys new-keys)))
             (append key '("desired" #f)))))
 
@@ -180,21 +180,22 @@
       (define struct-changes
         (in-generator
           (for ((a-change changes))
-            (match-let (((list table pkey "desired" data) a-change))
-              (let* ((key (list table pkey))
-                     (old (hash-ref remote-state key #f)))
-                (cond
-                  ((and data old)
-                   (hash-set! remote-state key data)
-                   (yield (change table pkey data)))
+            (match-let (((list table pkey "desired" next) a-change))
+              (let ((table (string->table table)))
+                (let* ((key (list table pkey))
+                       (prev (hash-ref remote-state key #f)))
+                  (cond
+                    ((and next prev)
+                     (hash-set! remote-state key next)
+                     (yield (change table pkey prev next)))
 
-                  (data
-                   (hash-set! remote-state key data)
-                   (yield (change table pkey data)))
+                    (next
+                      (hash-set! remote-state key next)
+                      (yield (change table pkey prev next)))
 
-                  (old
-                   (hash-remove! remote-state key)
-                   (yield (change table pkey #f)))))))))
+                    (prev
+                      (hash-remove! remote-state key)
+                      (yield (change table pkey prev #f))))))))))
 
       (let ((transaction (sequence->list struct-changes)))
         (fast-channel-put changes-channel transaction)))
@@ -208,15 +209,17 @@
       (define list-changes
         (for/list ((a-change changes))
           (match a-change
-            ((change table pkey #f)
-             (let ((key (list table pkey)))
-               (hash-remove! local-state key))
-             (list table pkey "current" #f))
+            ((change table pkey _ #f)
+             (let* ((table (table->string table))
+                    (key (list table pkey)))
+               (hash-remove! local-state key)
+               (list table pkey "current" #f)))
 
-            ((change table pkey data)
-             (let ((key (list table pkey)))
-               (hash-set! local-state key data))
-             (list table pkey "current" data)))))
+             ((change table pkey _ next)
+              (let* ((table (table->string table))
+                     (key (list table pkey)))
+                (hash-set! local-state key next)
+                (list table pkey "current" next))))))
 
       ;; Delay sending incremental changes until after we have
       ;; synchronized communication with peer. Prevents lots of
@@ -237,8 +240,8 @@
 
     (begin
       ;; Automatically claim that the host exists.
-      (publish/one (change "host" uuid (hasheq 'uuid uuid
-                                               'status "present")))
+      (publish/one (change 'host uuid #f (hasheq 'uuid uuid
+                                                 'status "present")))
 
       ;; Ask for our configuration as soon as possible.
       (request-resync))
@@ -246,6 +249,13 @@
 
     ;; Construct parent object.
     (super-new)))
+
+
+(define (table->string table)
+  (string-replace (symbol->string table) "-" "_"))
+
+(define (string->table str)
+  (string->symbol (string-replace str "_" "-")))
 
 
 ; vim:set ts=2 sw=2 et:

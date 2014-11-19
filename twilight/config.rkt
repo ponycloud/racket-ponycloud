@@ -5,57 +5,45 @@
 
 (require racket/contract
          racket/generic
-         racket/match
-         racket/set
-         json)
+         racket/set)
 
-(require twilight/unit)
+(require misc1/syntax)
+
+(require twilight/config/types
+         twilight/config/empty
+         twilight/config/nic
+         twilight/config/bond
+         twilight/config/role
+         twilight/config/vlan)
+
+(provide
+  (all-from-out twilight/config/types))
 
 (provide
   (contract-out
-    (struct change ((table string?)
-                    (pkey pkey/c)
-                    (data data/c)))
-
-    (config? predicate/c)
-    (config-type (-> config? symbol?))
-    (config-pkey (-> config? any/c))
-    (config-delete? (-> config? boolean?))
-    (config-spawn-unit (-> config? units/c unit?))
-    (config-can-apply? (-> config? change? boolean?))
-    (config-apply-change (-> config? change? config?))
-
     (apply-change (->* (change?) ((set/c config?)) (set/c config?)))))
 
-(define pkey/c
-  (or/c string? integer? (listof (recursive-contract pkey/c))))
 
-(define data/c
-  (hash/c symbol? jsexpr?))
-
-(define units/c
-  (hash/c (list/c symbol? any/c) unit?))
-
-
-(struct change
-  (table pkey data)
-  #:transparent)
-
-
-(define-generics config
-  (config-type config)
-  (config-pkey config)
-  (config-delete? config)
-  (config-can-apply? config change)
-  (config-apply-change config change)
-  (config-spawn-unit config other-units))
+(define no-config
+  (empty-config))
 
 
 (define (apply-change a-change (configs (set)))
-  (for/set ((a-config configs))
-    (if (config-can-apply? a-config a-change)
-        (config-apply-change a-config a-change)
-        (values a-config))))
+  (if (change-prev a-change)
+      (update-configs configs a-change)
+      (when (config-can-change? no-config a-change)
+        (let ((new-config (config-change no-config a-change)))
+          (set-add configs new-config)))))
+
+
+(define (update-configs configs a-change)
+  (define new-configs
+    (for/set ((a-config configs))
+      (if (config-can-change? a-config a-change)
+          (config-change a-config a-change)
+          a-config)))
+
+  (filter values new-configs))
 
 
 ; vim:set ts=2 sw=2 et:

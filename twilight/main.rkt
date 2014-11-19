@@ -10,8 +10,7 @@
          racket/set
          json)
 
-(require misc1/syntax
-         misc1/evt)
+(require misc1/evt)
 
 (require libuuid
          libvirt
@@ -89,21 +88,26 @@
       never-evt)
 
     (define (update new-configs)
-      (define old-configs configs)
-      (set! configs new-configs)
+      (let ((old-configs configs)
+            (new-units (hash-copy units))
+            (mod-units (mutable-seteq)))
+        ;; Save updated configuration objects.
+        (set! configs new-configs)
 
-      (define new-units
-        (mutable-seteq))
+        ;; Spawn units for modified configurations.
+        (for ((a-config (set-subtract configs old-configs)))
+          (let ((new-unit (config-spawn-unit a-config new-units))
+                (key      (list (config-type a-config)
+                                (config-pkey a-config))))
+            (hash-set! new-units key new-unit)
+            (set-add!  mod-units new-unit)))
 
-      (for ((a-config (set-subtract configs old-configs)))
-        (let ((unit (config-spawn-unit units a-config))
-              (key  (list (config-type a-config)
-                          (config-pkey a-config))))
-          (hash-set! units key unit)
-          (set-add!  new-units unit)))
+        ;; Save updated unit collection.
+        (set! units new-units)
 
-      (for ((unit new-units))
-        (unit-start! unit)))
+        ;; Start modified units.
+        (for ((unit-to-start mod-units))
+          (unit-start! unit-to-start))))
 
     ;; Read the initial device events.
     (begin

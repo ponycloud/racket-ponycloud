@@ -31,8 +31,7 @@
 
     (field (uuid uuid?)
            (sparkle (is-a?/c sparkle%))
-           (blkdev-evt (evt/c symbol? device?))
-           (netdev-evt (evt/c symbol? device?)))
+           (device-evt (evt/c symbol? device?)))
 
     (field (configs (set/c config?))
            (units (hash/c (list/c symbol? any/c) unit?)))
@@ -57,8 +56,7 @@
                          (connect-to connect-to))))
 
     ;; Udev device monitoring.
-    (field (blkdev-evt (device-changed-evt #:subsystems '(block)))
-           (netdev-evt (device-changed-evt #:subsystems '(net))))
+    (field (device-evt (device-changed-evt #:subsystems '(block net))))
 
     ;; Hash tables with configurations and running/finished units.
     (field (configs (set))
@@ -70,24 +68,25 @@
         (choice-evt
           (wrap-evt (send sparkle get-evt)
                     (λ (changes)
-                      (update (foldl apply-change configs changes))))
+                      (apply-changes! changes)))
 
           (wrap-evt (get-units-evt)
                     (λ (changes)
                       (send sparkle publish changes)))
 
-          (wrap-evt blkdev-evt
+          (wrap-evt device-evt
                     (λ (action device)
-                      (void)))
-
-          (wrap-evt netdev-evt
-                    (λ (action device)
-                      (void))))))
+                      (apply-changes!
+                        (list (device-change action device))))))))
 
     (define (get-units-evt)
       never-evt)
 
-    (define (update new-configs)
+    (define (apply-changes! changes)
+      (update!
+        (foldl apply-change configs changes)))
+
+    (define (update! new-configs)
       (let ((old-configs configs)
             (new-units (hash-copy units))
             (mod-units (mutable-seteq)))
@@ -110,15 +109,22 @@
           (unit-start! unit-to-start))))
 
     ;; Read the initial device events.
-    (begin
-      (for ((sys-path (list-devices #:subsystems '(net))))
-        (void (device sys-path)))
-
-      (for ((sys-path (list-devices #:subsystems '(block))))
-        (void (device sys-path))))
+    (apply-changes!
+      (for/list ((sys-path (list-devices #:subsystems '(net block))))
+        (device-change 'add device)))
 
     ;; Construct parent object.
     (super-new)))
+
+
+(define (device-change action device)
+  (let ((data (device-properties device))
+        (subs (device-subsystem device)))
+    (change (string->symbol
+              (format "dev/~a" subs))
+            (device-sys-name device)
+            (if (eq? action 'remove) data #f)
+            (if (eq? action 'remove) #f data))))
 
 
 ; vim:set ts=2 sw=2 et:

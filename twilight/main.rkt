@@ -59,7 +59,7 @@
     (field (device-evt (device-changed-evt #:subsystems '(block net))))
 
     ;; Hash tables with configurations and running/finished units.
-    (field (configs (set))
+    (field (configs (set no-config))
            (units (make-hash)))
 
     ;; Complex event that runs Twilight without producing any values.

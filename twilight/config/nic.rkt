@@ -36,13 +36,6 @@
      (and (not (nic-config-bond-uuid self))
           (not (nic-config-link-name self))))
 
-   (define (config-can-change? self a-change)
-     (let ((table (change-table a-change))
-           (pkey/config (config-pkey self))
-           (pkey/change (change-pkey a-change)))
-       (and (eq? 'nic table)
-            (equal? pkey/config pkey/change))))
-
    (define (config-change self a-change)
      (if (change-next a-change)
          (let ((bond-uuid (change-ref/next a-change 'bond)))

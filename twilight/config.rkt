@@ -21,6 +21,7 @@
 
 (provide
   (contract-out
+    (no-config config?)
     (apply-change (->* (change?) ((set/c config?)) (set/c config?)))))
 
 
@@ -28,22 +29,9 @@
   (empty-config))
 
 
-(define (apply-change a-change (configs (set)))
-  (if (change-prev a-change)
-      (update-configs configs a-change)
-      (when (config-can-change? no-config a-change)
-        (let ((new-config (config-change no-config a-change)))
-          (set-add configs new-config)))))
-
-
-(define (update-configs configs a-change)
-  (define new-configs
-    (for/set ((a-config configs))
-      (if (config-can-change? a-config a-change)
-          (config-change a-config a-change)
-          a-config)))
-
-  (filter values new-configs))
+(define (apply-change a-change (configs (set no-config)))
+  (for/set ((a-config configs))
+    (config-change a-config a-change)))
 
 
 ; vim:set ts=2 sw=2 et:

@@ -11,6 +11,7 @@
          racket/match)
 
 (require twilight/util
+         twilight/unit
          twilight/config/types
          twilight/config/nic
          twilight/config/bond
@@ -26,11 +27,7 @@
   ()
   #:transparent
   #:methods gen:config
-  ((define (config-can-change? a-config a-change)
-     (and (not (change-prev a-change))
-          (memq (change-table) '(nic bond net-role vlan))))
-
-   (define (config-change a-config a-change)
+  ((define (config-change a-config a-change)
      (match a-change
        ((change 'nic hwaddr _ next)
         (nic-config hwaddr #f
@@ -53,6 +50,20 @@
 
        ((change 'vlan (list bond-uuid vlan-tag) _ next)
         (vlan-config bond-uuid vlan-tag
-                     (allocate-vlan-name)))))))
+                     (allocate-vlan-name)))
+
+       (else a-config)))
+
+   (define (config-delete? a-config)
+     #f)
+
+   (define (config-spawn-unit a-config other-units)
+     (spawn-unit #t))
+
+   (define (config-table a-config)
+     'no-config-table)
+
+   (define (config-pkey a-config)
+     "no-config-pkey")))
 
 ; vim:set ts=2 sw=2 et:

@@ -27,7 +27,6 @@
     (config-pkey (-> config? any/c))
     (config-delete? (-> config? boolean?))
     (config-spawn-unit (-> config? units/c unit?))
-    (config-can-change? (-> config? change? boolean?))
     (config-change (-> config? change? config?))))
 
 (define pkey/c
@@ -44,7 +43,6 @@
   (config-type config)
   (config-pkey config)
   (config-delete? config)
-  (config-can-change? config change)
   (config-change config change)
   (config-spawn-unit config other-units))
 

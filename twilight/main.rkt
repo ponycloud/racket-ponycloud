@@ -111,18 +111,18 @@
     ;; Read the initial device events.
     (apply-changes!
       (for/list ((sys-path (list-devices #:subsystems '(net block))))
-        (device-change 'add device)))
+        (device-change 'add (device sys-path))))
 
     ;; Construct parent object.
     (super-new)))
 
 
-(define (device-change action device)
-  (let ((data (device-properties device))
-        (subs (device-subsystem device)))
+(define (device-change action a-device)
+  (let ((data (device-properties a-device))
+        (subs (device-subsystem a-device)))
     (change (string->symbol
               (format "dev/~a" subs))
-            (device-sys-name device)
+            (device-sys-name a-device)
             (if (eq? action 'remove) data #f)
             (if (eq? action 'remove) #f data))))
 

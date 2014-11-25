@@ -7,8 +7,9 @@
          racket/contract
          racket/match)
 
-(require libuuid
-         kernel/link)
+(require misc1/match
+         kernel/link
+         libuuid)
 
 (require twilight/util
          twilight/unit
@@ -18,7 +19,7 @@
   (contract-out
     (struct nic-config
       ((hwaddr hwaddr?)
-       (link-name string?)
+       (link-name (maybe/c string?))
        (bond-uuid (maybe/c uuid?))))))
 
 
@@ -37,10 +38,28 @@
           (not (nic-config-link-name self))))
 
    (define (config-change self a-change)
-     (if (change-next a-change)
-         (let ((bond-uuid (change-ref/next a-change 'bond)))
-           (struct-copy nic-config self (bond-uuid bond-uuid)))
-         (struct-copy nic-config self (bond-uuid #f))))
+     (let ((hwaddr (nic-config-hwaddr self)))
+       (match a-change
+         ((change 'nic (equal hwaddr) prev next)
+          (if next
+              (let ((bond-uuid (hash-ref next 'bond)))
+                (struct-copy nic-config self (bond-uuid bond-uuid)))
+              (struct-copy nic-config self (bond-uuid #f))))
+
+         ((change 'dev/net pkey prev #f)
+          (let ((device-hwaddr (props-hwaddr prev)))
+            (if (equal? hwaddr device-hwaddr)
+                (struct-copy nic-config self (link-name #f))
+                self)))
+
+         ((change 'dev/net pkey _ next)
+          (let ((device-hwaddr (props-hwaddr next))
+                (link-name (hash-ref next 'interface)))
+            (if (equal? hwaddr device-hwaddr)
+                (struct-copy nic-config self (link-name link-name))
+                self)))
+
+         (else self))))
 
    (define (config-spawn-unit self others)
      (match self

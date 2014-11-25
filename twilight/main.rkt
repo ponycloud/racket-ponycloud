@@ -59,7 +59,7 @@
     (field (device-evt (device-changed-evt #:subsystems '(block net))))
 
     ;; Hash tables with configurations and running/finished units.
-    (field (configs (set no-config))
+    (field (configs (set))
            (units (make-hash)))
 
     ;; Complex event that runs Twilight without producing any values.
@@ -73,6 +73,10 @@
           (wrap-evt (get-units-evt)
                     (λ (changes)
                       (send sparkle publish changes)))
+
+          (guard-evt (λ ()
+                       ;; TODO: process unit results
+                       (apply choice-evt (hash-values units))))
 
           (wrap-evt device-evt
                     (λ (action device)

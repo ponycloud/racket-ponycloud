@@ -21,7 +21,6 @@
 
 (provide
   (contract-out
-    (no-config config?)
     (apply-change (->* (change?) ((set/c config?)) (set/c config?)))))
 
 
@@ -30,8 +29,9 @@
 
 
 (define (apply-change a-change (configs (set no-config)))
-  (for/set ((a-config configs))
-    (config-change a-config a-change)))
+  (set-remove (for/set ((a-config (set-add configs no-config)))
+                (config-change a-config a-change))
+              no-config))
 
 
 ; vim:set ts=2 sw=2 et:

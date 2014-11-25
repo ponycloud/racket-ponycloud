@@ -5,7 +5,9 @@
 
 (require racket/contract
          racket/generator
-         racket/format)
+         racket/format
+         racket/string
+         racket/list)
 
 (provide
   (contract-out
@@ -15,7 +17,9 @@
     (allocate-bond-name (-> string?))
     (allocate-vlan-name (-> string?))
     (allocate-bridge-name (-> string?))
-    (allocate-vxlan-name (-> string?))))
+    (allocate-vxlan-name (-> string?))
+
+    (props-hwaddr (-> (hash/c symbol? string?) (or/c hwaddr? #f)))))
 
 
 (define (make-allocator prefix num-bytes)
@@ -43,6 +47,16 @@
 (define (hwaddr? v)
   (and (string? v)
        (regexp-match? #px"^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2})*$" v)))
+
+
+(define (props-hwaddr props)
+  (id-net-name-mac->hwaddr
+    (hash-ref props 'id-net-name-mac #f)))
+
+(define (id-net-name-mac->hwaddr id-net-name-mac)
+  (and id-net-name-mac
+       (let ((hex-mac (last (regexp-split "x" id-net-name-mac))))
+         (string-join (regexp-match* ".." hex-mac) ":"))))
 
 
 ; vim:set ts=2 sw=2 et:

@@ -4,6 +4,7 @@
 ;
 
 (require racket/contract
+         racket/function
          racket/match)
 
 (require misc1/syntax
@@ -26,23 +27,15 @@
   #:property prop:evt (struct-field-index evt))
 
 
-(define (make-raiser exn)
-  (λ ()
-    (raise exn)))
-
-(define (make-producer . results)
-  (λ ()
-    (apply values results)))
-
 (define (call/wrap a-proc)
-  (with-handlers ((void make-raiser))
-    (call-with-values a-proc make-producer)))
+  (with-handlers ((void values))
+    (call-with-values a-proc list)))
 
 
 (define (make-unit long-running-proc)
   (let* ((wlock (make-semaphore 0))
          (rwlock (make-rwlock wlock)))
-    (let ((result void))
+    (let ((result null))
       (let ((thread (parameterize-break #f
                       (spawn-thread
                         (parameterize-break #t
@@ -51,12 +44,15 @@
                         (semaphore-post wlock)))))
         (let ((event (wrap-evt thread
                                (λ (thread)
-                                 (result)))))
+                                 (apply values result)))))
           (unit thread event wlock rwlock))))))
 
 (define (call-with-unit-result unit proc)
   (with-read-lock (unit-rwlock unit)
-    (proc (sync unit))))
+    (let ((result (sync unit)))
+      (when (exn? result)
+        (raise result))
+      (proc result))))
 
 
 (define (unit-start! an-unit)
@@ -79,7 +75,7 @@
      (begin body ...))))
 
 (define-syntax-rule (spawn-unit body ...)
-  (make-unit (λ () body ...)))
+  (make-unit (thunk body ...)))
 
 
 ; vim:set ts=2 sw=2 et:

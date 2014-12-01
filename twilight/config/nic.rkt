@@ -122,12 +122,12 @@
           (list))
 
          ((exn message _)
-          (list (change 'host-nic hwaddr #f
+          (list (change 'nic hwaddr #f
                         (hasheq 'status "broken"))))
 
          (else
           (let ((result (hash-set result 'hwaddr hwaddr)))
-            (list (change 'host-nic hwaddr #f result)))))))))
+            (list (change 'nic hwaddr #f result)))))))))
 
 
 ; vim:set ts=2 sw=2 et:

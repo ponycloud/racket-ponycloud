@@ -33,13 +33,12 @@
         (values self))
 
        ((change 'nic hwaddr _ next)
-        (nic-config hwaddr #f
-                    (hash-ref next 'bond)))
+        (nic-config hwaddr #t #f (hash-ref next 'bond)))
 
        ((change 'dev/net _ _ next)
         (let ((hwaddr (props-hwaddr next))
               (iface  (hash-ref next 'interface)))
-          (if hwaddr (nic-config hwaddr iface #f) self)))
+          (if hwaddr (nic-config hwaddr #f iface #f) self)))
 
        ((change 'bond uuid _ next)
         (bond-config uuid

@@ -4,13 +4,15 @@
 ;
 
 (require racket/contract
+         racket/function
          racket/class
          racket/match
          racket/list
          racket/set
          json)
 
-(require misc1/evt)
+(require misc1/syntax
+         misc1/evt)
 
 (require libuuid
          libvirt
@@ -62,6 +64,9 @@
     (field (configs (set))
            (units (make-hash)))
 
+    ;; Units whose result have not yet been reported.
+    (define pending-units (mutable-set))
+
     ;; Complex event that runs Twilight without producing any values.
     (define/public (get-evt)
       (recurring-evt
@@ -72,11 +77,8 @@
 
           (wrap-evt (get-units-evt)
                     (λ (changes)
-                      (send sparkle publish changes)))
-
-          (guard-evt (λ ()
-                       ;; TODO: process unit results
-                       (apply choice-evt (hash-values units))))
+                      (let ((changes (map inject-host changes)))
+                        (send sparkle publish changes))))
 
           (wrap-evt device-evt
                     (λ (action device)
@@ -84,11 +86,18 @@
                         (list (device-change action device))))))))
 
     (define (get-units-evt)
-      never-evt)
+      (guard-evt
+        (thunk (apply choice-evt (set->list pending-units)))))
 
     (define (apply-changes! changes)
       (update!
         (foldl apply-change configs changes)))
+
+    (define (inject-host a-change)
+      (match-let (((change table pkey prev next) a-change))
+        (let ((prev (if prev (hash-set prev 'host uuid) prev))
+              (next (if next (hash-set next 'host uuid) next)))
+          (change table pkey prev next))))
 
     (define (update! new-configs)
       (let ((old-configs configs)
@@ -100,10 +109,19 @@
         ;; Spawn units for modified configurations.
         (for ((a-config (set-subtract configs old-configs)))
           (let ((new-unit (config-spawn-unit a-config new-units))
-                (key      (list (config-type a-config)
+                (key      (cons (config-type a-config)
                                 (config-pkey a-config))))
             (hash-set! new-units key new-unit)
-            (set-add!  mod-units new-unit)))
+            (set-add!  mod-units new-unit)
+
+            (set-add! pending-units
+                      (recursive (new-evt)
+                        (wrap-evt new-unit
+                                  (λ (result)
+                                    (set-remove! pending-units new-evt)
+                                    (when (config-delete? a-config)
+                                      (set-remove! configs a-config))
+                                    (config-report a-config result)))))))
 
         ;; Save updated unit collection.
         (set! units new-units)

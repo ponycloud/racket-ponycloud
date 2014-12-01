@@ -27,7 +27,8 @@
     (config-pkey (-> config? any/c))
     (config-delete? (-> config? boolean?))
     (config-spawn-unit (-> config? units/c unit?))
-    (config-change (-> config? change? config?))))
+    (config-change (-> config? change? config?))
+    (config-report (-> config? any/c (listof change?)))))
 
 (define pkey/c
   (or/c string? integer? (listof (recursive-contract pkey/c))))
@@ -44,7 +45,8 @@
   (config-pkey config)
   (config-delete? config)
   (config-change config change)
-  (config-spawn-unit config other-units))
+  (config-spawn-unit config other-units)
+  (config-report config result))
 
 (struct change
   (table pkey prev next)
